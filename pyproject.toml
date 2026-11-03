@@ -1,0 +1,68 @@
+[project]
+name = "uaar"
+version = "0.1.0"
+description = "Uncertainty-aware open-set exercise recognition from a wrist IMU (CompE 510, SDSU, Fall 2026)"
+readme = "README.md"
+authors = [
+    { name = "Robert Ashe", email = "123716477+nthPerson@users.noreply.github.com" },
+    { name = "Sirena Rocca" },
+]
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "numpy>=2.0",
+    "scipy>=1.14",
+    "pandas>=2.2",
+    "pyarrow>=17",
+    "scikit-learn>=1.5",
+    "matplotlib>=3.9",
+    "pyyaml>=6",
+    "streamlit>=1.39",
+    "pyserial>=3.5",
+    "bleak>=0.22",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "tqdm>=4.66",
+]
+
+[project.optional-dependencies]
+cpu = ["torch>=2.5"]
+cu128 = ["torch>=2.5"]
+
+[dependency-groups]
+dev = ["pytest>=8", "ruff>=0.6", "ipykernel>=6", "jupyter>=1"]
+
+[tool.uv]
+conflicts = [[{ extra = "cpu" }, { extra = "cu128" }]]
+
+[tool.uv.sources]
+torch = [
+    { index = "pytorch-cpu", extra = "cpu" },
+    { index = "pytorch-cu128", extra = "cu128" },
+]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[build-system]
+requires = ["uv_build>=0.12.22,<0.13.0"]
+build-backend = "uv_build"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["notebooks", "firmware", "web"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "NPY"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["slow: needs data/processed; not run in CI"]
+addopts = "-q"
