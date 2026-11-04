@@ -1,0 +1,10 @@
+# AI-use log
+
+A running record of AI assistance, kept so the final report's disclosure section is accurate. Add a line each time an AI tool contributes something.
+
+| Date | Tool | What it did | What the team did |
+|---|---|---|---|
+| 2026-09-27 | Claude Code (Claude Opus 5.5) | Brainstormed project options against the course requirements; checked dataset availability; drafted this `docs/uncertainty-aware-activity-recognition/` outline (datasets, models, evaluation, software/firmware specs, references) | Robert chose the topic, approved the outline and assigned roles |
+| 2026-09-27 | Claude Code (Claude Opus 5.5) | Drafted the 5-slide proposal deck on the SDSU template, with speaker notes | Review, edit and present |
+| 2026-10-08 | Claude Code (Claude Fable 5.1) | Drafted `development-spec.md` (repository layout and tooling, data contracts, module interfaces, test list, documentation plan, review rules, week-by-week schedule) from the existing design docs and the project instructions | Robert requested it after the instructor confirmed AI-written code is allowed with disclosure; review, adjust roles with Sirena, adopt |
+| 2026-11-03 | Claude Code (Claude Fable 5.1) | Attached the wearable to WSL and verified the FormCoach firmware stream; brainstormed the plan for the live demo, fine-tuning and own firmware; bootstrapped the `uaar` repository (`pyproject.toml`, layout, CI-less first commits); wrote firmware v0.1.0 (`firmware/`: BMI160 driver, BLE GATT, button/LED, main loop), diagnosed and fixed the BMI160 write-timing bug on the bench; wrote `uaar.data.recording`, `uaar.data.wearable` with tests, and `scripts/record_wearable.py`; rewrote the development-spec schedule and wrote `docs/decisions.md` | Robert set the goals (live demo, fine-tuning, minimal data collection), answered the design questions, woke and re-plugged the board, approved the plan; will review every module before Sirena's review |

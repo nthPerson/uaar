@@ -1,0 +1,31 @@
+{
+  "subject": "W01",
+  "session": "test-60s",
+  "started_at": "2026-11-03T16:03:01",
+  "port": "/dev/ttyACM0",
+  "placement": "left wrist, case arrow toward the elbow",
+  "note": "firmware 0.1.0 bench test, device flat on the desk",
+  "sample_rate_hz": 50,
+  "acc_lsb_per_g": 4096.0,
+  "gyr_lsb_per_dps": 32.8,
+  "firmware": "0.1.0",
+  "device_name": "UAAR-8428",
+  "imu_status": "ok",
+  "imu_registers": "addr=0x69 err=0x00 pmu=0x14 acc_conf=0x28 acc_range=0x08 gyr_conf=0x28 gyr_range=0x01",
+  "gyro_bias_applied": false,
+  "gyro_bias_lsb": [
+    0,
+    0,
+    0
+  ],
+  "n_samples": 3091,
+  "n_dropped": 0,
+  "n_gaps": 0,
+  "sets": [
+    {
+      "set_index": 0,
+      "label": "still_on_desk",
+      "seconds": 18.5
+    }
+  ]
+}

@@ -23,3 +23,8 @@ firmware/.pio/
 .idea/
 .DS_Store
 Thumbs.db
+
+# our own recordings are small and tracked
+!data/
+data/*
+!data/wearable/

@@ -1,0 +1,2 @@
+set_index,label,session_id,t_start_ms,t_end_ms,seq_start,seq_end,n_samples,n_dropped
+0,still_on_desk,2,248497,266997,12398,13323,926,0
