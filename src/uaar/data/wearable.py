@@ -98,7 +98,18 @@ class Sample:
     seq: int
 
     def as_csv(self) -> str:
-        return f"{self.t_ms},{self.ax},{self.ay},{self.az},{self.gx},{self.gy},{self.gz},{self.flags},{self.seq}"
+        fields = (
+            self.t_ms,
+            self.ax,
+            self.ay,
+            self.az,
+            self.gx,
+            self.gy,
+            self.gz,
+            self.flags,
+            self.seq,
+        )
+        return ",".join(str(v) for v in fields)
 
 
 def parse_csv_line(line: str) -> Sample | None:
@@ -221,9 +232,15 @@ def load_session(session_dir: Path | str) -> Recording:
     """A recorded session directory -> Recording in physical units with per-set labels."""
     session_dir = Path(session_dir)
     raw, comments = read_raw_csv(session_dir / "raw.csv")
-    meta = json.loads((session_dir / "meta.json").read_text()) if (session_dir / "meta.json").exists() else {}
+    meta = (
+        json.loads((session_dir / "meta.json").read_text())
+        if (session_dir / "meta.json").exists()
+        else {}
+    )
     events_path = session_dir / "events.csv"
-    events = pd.read_csv(events_path) if events_path.exists() else pd.DataFrame(columns=EVENTS_COLUMNS)
+    events = (
+        pd.read_csv(events_path) if events_path.exists() else pd.DataFrame(columns=EVENTS_COLUMNS)
+    )
     phys = raw_to_physical(raw)
     n_dropped, n_gaps = seq_gaps(raw["seq"].to_numpy())
     meta = {**meta, "n_dropped": n_dropped, "n_gaps": n_gaps, "banner": comments[:12]}

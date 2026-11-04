@@ -1,0 +1,3 @@
+# MC Dropout does not train: evaluate.py --method mcdropout --from <softmax run>
+method: mcdropout
+model: {mcdropout: {T: 30}}
