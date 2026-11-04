@@ -19,3 +19,11 @@ Dated log of design and plan changes. Each entry says what changed, why, and whi
 **Datasets.** The public downloads were copied from the FormCoach machine's `data/external/` (same public files; download facts in `design/datasets.md` are cited from FormCoach's profiling). Only data files, no code.
 
 **Schedule.** The Oct 8 week plan did not run; §10 of the development spec was rewritten from Nov 3 to Dec 8 with the decision point moved to Nov 18.
+
+**RecoFit junk labels and the class pool (first real run).** Dropped as junk: the device-tap labels
+("Tap Left Device", "Tap Right Device", "Tap IMU Device"), "Arm Band Adjustment", "Device on
+Table", "<Initial Activity>", "Note", "Invalid" (650 single-exercise recordings, about 11 h).
+Kept: "Non-Exercise" and "Rest" as the non-exercise set (P1-b), never as classes
+(`split.nonexercise_labels`); "Unlisted Exercise" (4 subjects, never eligible) and "Walk" as
+ordinary labels for now. The eligibility thresholds are still the spec defaults; the counts per
+alternative are in `data-pipeline.md` and the decision is item 4.4.
