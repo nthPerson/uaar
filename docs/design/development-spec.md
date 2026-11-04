@@ -385,11 +385,12 @@ Revised 2026-11-03. The original W0–W3 plan (Oct 8 – Nov 1) did not run: the
 | # | Item | Owner | Done when |
 |---|---|---|---|
 | 4.1 | Repository bootstrap (§2.3); firmware v0.1.0 flashed and verified; `wearable.py` + tests; `record_wearable.py`; 60-s test recording | R | **done Nov 3** |
+| 4.1b | `windows.py`, `splits.py`, `registry.py`, `Config`, `train_loop.py`, `backbone.py`, `softmax.py`, `edl.py`, `normalize.py`, `threshold.py`, `prepare_data.py`, `train.py` written and tested on synthetic data (ahead of 4.4, 5.2, 5.3); `uaar.live` backend, `live_replay.py` and the `web/` page (4.6) working with a placeholder predictor | R | **done Nov 3**, pending the real-data run |
 | 4.2 | GitHub remote `uaar` (public), CI green, Sirena's clone passes `pytest` | R, S | first CI-green commit |
 | 4.3 | `recofit.py` single- and multi-activity loaders → `recordings.parquet`; the 75 labels printed to `docs/data-pipeline.md` | R | label list committed |
 | 4.4 | `windows.py`, `splits.py` + leakage tests; eligibility thresholds decided; `rand0–2` and `near` splits; T1 | R (near pairs B) | `splits/*.json`, T1 generated |
 | 4.5 | `metrics.py`, `calibration.py`, `threshold.py` + tests (§7); read Gal & Ghahramani 2016 | S | tests pass |
-| 4.6 | Browser page `web/`: Web Bluetooth connect, live charts, session state from the button, record mode that saves the session CSV | R | streams from a kit in Windows Chrome |
+| 4.6 | Browser page `web/`: Web Bluetooth connect, live charts, session state from the button, record mode that saves the session CSV | R | written and simulator-tested Nov 3; **to verify against a kit in Windows Chrome** |
 | 4.7 | Sirena's kit assembled and flashed; both kits gyro-calibrated; exercise set confirmed against the label list (§12) | B | `docs/wearable-recording.md` device table |
 
 **Milestone M1 (Nov 8, tag `m1-data`):** windows and splits on disk, T1 generated, both wearables streaming.
