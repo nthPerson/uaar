@@ -168,3 +168,26 @@ def test_to_app_csv(tmp_path):
     df = pd.read_csv(out)
     assert list(df.columns) == ["t", "ax", "ay", "az", "gx", "gy", "gz"]
     assert len(df) == 300
+
+
+def test_to_recordings_concatenates_sessions(tmp_path):
+    _write_session(tmp_path)
+    d2 = tmp_path / "W02" / "s01"
+    d2.mkdir(parents=True)
+    (d2 / "raw.csv").write_text(
+        "\n".join(
+            [w.SERIAL_CSV_HEADER]
+            + [w.Sample(20 * i, 4096, 0, 0, 0, 0, 0, 0, i).as_csv() for i in range(100)]
+        )
+        + "\n"
+    )
+    out = w.to_recordings(tmp_path, tmp_path / "proc")
+    df = pd.read_parquet(out)
+    assert set(df["subject"]) == {"W01", "W02"} and len(df) == 400
+    assert set(df["recording_id"]) == {"W01/s01", "W02/s01"}
+    meta = json.loads((tmp_path / "proc" / "recordings.meta.json").read_text())
+    assert (
+        meta["dataset"] == "wearable"
+        and len(meta["sessions"]) == 2
+        and meta["labels"]["curl"]["subjects"] == 1
+    )

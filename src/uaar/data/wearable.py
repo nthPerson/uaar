@@ -260,3 +260,53 @@ def to_app_csv(rec: Recording, path: Path | str) -> None:
     """Write the demo app's input format: ``t,ax,ay,az,gx,gy,gz`` (s, g, deg/s)."""
     df = rec.to_frame()[["t", "ax", "ay", "az", "gx", "gy", "gz"]]
     df.to_csv(path, index=False, float_format="%.5f")
+
+
+def to_recordings(
+    sessions_root: Path | str, out_dir: Path | str, sample_rate_hz: float = SAMPLE_RATE_HZ
+) -> Path:
+    """Every ``<sessions_root>/<subject>/<session>/`` -> ``out_dir/recordings.parquet`` + meta.
+
+    Sessions are concatenated in sorted order; ``source`` is the session id and ``recording_id``
+    is ``<subject>/<session>``. Only sessions with a ``raw.csv`` are used.
+    """
+    sessions_root, out_dir = Path(sessions_root), Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    frames, sessions, labels = [], [], {}
+    for raw in sorted(sessions_root.glob("*/*/raw.csv")):
+        rec = load_session(raw.parent)
+        rec.recording_id = f"{rec.subject}/{raw.parent.name}"
+        rec.source = raw.parent.name
+        df = rec.to_frame()
+        frames.append(df)
+        sessions.append(
+            {
+                "subject": rec.subject,
+                "session": raw.parent.name,
+                "n_samples": rec.n_samples,
+                "n_dropped": rec.meta.get("n_dropped", 0),
+                "firmware": rec.meta.get("firmware"),
+                "device_name": rec.meta.get("device_name"),
+                "transport": rec.meta.get("transport", "serial"),
+            }
+        )
+        for lab, cnt in df["label"].value_counts().items():
+            labels.setdefault(lab, {"samples": 0, "subjects": set()})
+            labels[lab]["samples"] += int(cnt)
+            labels[lab]["subjects"].add(rec.subject)
+    if not frames:
+        raise FileNotFoundError(f"no sessions under {sessions_root}")
+    all_df = pd.concat(frames, ignore_index=True)
+    all_df.to_parquet(out_dir / "recordings.parquet", index=False)
+    meta = {
+        "dataset": "wearable",
+        "sample_rate_hz": sample_rate_hz,
+        "units": {"acc": "g", "gyro": "deg/s", "t": "s"},
+        "sessions": sessions,
+        "labels": {
+            k: {"samples": v["samples"], "subjects": len(v["subjects"])}
+            for k, v in sorted(labels.items())
+        },
+    }
+    (out_dir / "recordings.meta.json").write_text(json.dumps(meta, indent=2))
+    return out_dir / "recordings.parquet"

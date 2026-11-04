@@ -48,6 +48,11 @@ def step_recordings(dataset: str, p: dict, force: bool, limit: int | None) -> No
                 sys.exit(f"missing {f}; run --steps download")
         with timer("recordings"):
             recofit.to_recordings(p["root"], single, multi, hash_sources=limit is None)
+    elif dataset == "wearable":
+        from uaar.data import wearable
+
+        with timer("recordings"):
+            wearable.to_recordings(registry.data_root() / "wearable", p["root"])
     else:
         sys.exit(f"{dataset}: recordings step not implemented yet")
 
