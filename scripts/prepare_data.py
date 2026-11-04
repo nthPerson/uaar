@@ -91,6 +91,7 @@ def step_splits(dataset: str, p: dict, cfg: Config, force: bool, near_file: Path
             val_frac=cfg.split.val_frac,
             dataset=dataset,
             hop_s=cfg.data.hop_s,
+            exclude=cfg.get("split.nonexercise_labels", []) or [],
         )
     first = json.loads(written[0].read_text())
     n_eligible = len(first["known_classes"]) + len(first["unknown_classes"])

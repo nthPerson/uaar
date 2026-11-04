@@ -240,3 +240,14 @@ def test_select_nonexercise_only_multi_source_test_subjects(meta, written):
     assert (rows["source"] == "multi").all()
     assert set(rows["label"]) == {"Rest", "Transition"}
     assert len(sp.select_nonexercise(meta, split, ["Nope"])) == 0
+
+
+def test_eligible_classes_exclude():
+    meta = pd.DataFrame(
+        {
+            "subject": [f"S{i}" for i in range(40)] * 2,
+            "label": ["Non-Exercise"] * 40 + ["Curl"] * 40,
+        }
+    )
+    assert sp.eligible_classes(meta, 2, 0.1) == ["Curl", "Non-Exercise"]
+    assert sp.eligible_classes(meta, 2, 0.1, exclude=["Non-Exercise"]) == ["Curl"]

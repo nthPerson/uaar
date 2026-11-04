@@ -83,6 +83,7 @@ def eligible_classes(
     min_subjects: int,
     min_minutes: float,
     hop_s: float = 1.0,
+    exclude: Iterable[str] = (),
 ) -> list[str]:
     """Labels with enough subjects and enough windowed minutes to be a known or unknown class.
 
@@ -92,11 +93,14 @@ def eligible_classes(
         min_minutes: A class needs at least this many minutes, counted as
             ``n_windows * hop_s / 60`` (each window adds ``hop_s`` seconds of new signal).
         hop_s: Hop used when the windows were made, in seconds.
+        exclude: Labels that are never classes, such as the non-exercise labels that form the
+            separate P1-b test set (``Non-Exercise``, ``Rest``).
 
     Returns:
         Sorted list of eligible label strings (``""`` is never eligible).
     """
-    labelled = meta[meta["label"].astype(str) != ""]
+    excluded = {""} | set(exclude)
+    labelled = meta[~meta["label"].astype(str).isin(excluded)]
     stats = labelled.groupby("label").agg(
         n_subjects=("subject", "nunique"), n_windows=("subject", "size")
     )
@@ -214,6 +218,7 @@ def write_splits(
     fold_seed: int = 0,
     dataset: str | None = None,
     hop_s: float = 1.0,
+    exclude: Iterable[str] = (),
 ) -> list[Path]:
     """Write every ``fold{k}_{classsplit}.json`` for a dataset (spec §3.3).
 
@@ -236,7 +241,7 @@ def write_splits(
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     dataset = dataset or out_dir.resolve().parent.name
-    classes = eligible_classes(meta, min_subjects, min_minutes, hop_s=hop_s)
+    classes = eligible_classes(meta, min_subjects, min_minutes, hop_s=hop_s, exclude=exclude)
     if len(classes) < 2:
         raise ValueError(f"only {len(classes)} eligible classes; relax the thresholds")
 

@@ -44,12 +44,20 @@ MASTER_DEVICE = "rightArm"
 # (development-spec §12); until then this list is a placeholder.
 # Names seen in the multi-activity file on 2026-11-03: "Tap Left Device", "Tap Right Device",
 # "Device on Table", "<Initial Activity>". "Non-Exercise" (idle) and "Unlisted Exercise" are kept.
-JUNK_LABEL_PATTERNS: tuple[str, ...] = ("tap ", "device on table", "initial activity", "adjust")
+# The single-activity label table (2026-11-03) adds "Note" (11 min) and "Invalid" (1.5 min).
+JUNK_LABEL_PATTERNS: tuple[str, ...] = (
+    "tap ",
+    "device on table",
+    "initial activity",
+    "adjust",
+    "invalid",
+)
+JUNK_LABELS_EXACT: frozenset[str] = frozenset({"Note"})
 
 
 def is_junk(label: str) -> bool:
     low = label.lower()
-    return any(p in low for p in JUNK_LABEL_PATTERNS)
+    return label in JUNK_LABELS_EXACT or any(p in low for p in JUNK_LABEL_PATTERNS)
 
 
 # ---- download ------------------------------------------------------------------------------
