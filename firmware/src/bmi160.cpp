@@ -28,23 +28,32 @@ uint8_t Bmi160::probe(TwoWire& wire) {
 bool Bmi160::begin(TwoWire& wire, uint8_t address) {
   wire_ = &wire;
   addr_ = address;
-  if (readReg(CHIP_ID_REG) != CHIP_ID) return false;
+  failure_ = "";
+  const uint8_t id = readReg(CHIP_ID_REG);
+  if (id != CHIP_ID) { failure_ = "chip id"; return false; }
   writeReg(CMD, CMD_SOFT_RESET);
   delay(60);
-  bool ok = writeReg(ACC_CONF, ACC_CONF_VAL);
-  ok &= writeReg(ACC_RANGE, ACC_RANGE_8G);
-  ok &= writeReg(GYR_CONF, GYR_CONF_VAL);
-  ok &= writeReg(GYR_RANGE, GYR_RANGE_1000DPS);
-  ok &= writeReg(CMD, CMD_ACC_PMU_NORMAL);
+  // Datasheet "interface idle time": in suspend mode (the state after reset) the chip needs
+  // >= 450 us between register accesses or writes are silently lost. Bring both sensors to
+  // normal power mode first, then write the configuration with a short delay after each write.
+  bool ok = writeReg(CMD, CMD_ACC_PMU_NORMAL);
   delay(5);  // accel start-up (datasheet: 3.8 ms)
   ok &= writeReg(CMD, CMD_GYR_PMU_NORMAL);
   delay(80);  // gyro start-up (datasheet: 80 ms)
-  // Verify the configuration landed: the datasheet's ERR_REG must be 0 and both PMUs normal.
-  ok &= readReg(ACC_CONF) == ACC_CONF_VAL && readReg(ACC_RANGE) == ACC_RANGE_8G;
-  ok &= readReg(GYR_CONF) == GYR_CONF_VAL && readReg(GYR_RANGE) == GYR_RANGE_1000DPS;
-  ok &= readReg(ERR_REG) == 0x00;
-  ok &= (readReg(PMU_STATUS) & 0x3C) == 0x14;  // gyr_pmu (bits 3:2) = 01, acc_pmu (5:4) = 01
-  return ok;
+  if (!ok) { failure_ = "pmu write"; return false; }
+  const uint8_t config[][2] = {
+      {ACC_CONF, ACC_CONF_VAL}, {ACC_RANGE, ACC_RANGE_8G}, {GYR_CONF, GYR_CONF_VAL}, {GYR_RANGE, GYR_RANGE_1000DPS}};
+  for (const auto& rv : config) {
+    ok &= writeReg(rv[0], rv[1]);
+    delay(2);
+  }
+  if (!ok) { failure_ = "config write"; return false; }
+  // Verify the configuration landed and both sensors are in normal power mode.
+  if (readReg(ACC_CONF) != ACC_CONF_VAL || readReg(ACC_RANGE) != ACC_RANGE_8G) { failure_ = "acc readback"; return false; }
+  if (readReg(GYR_CONF) != GYR_CONF_VAL || readReg(GYR_RANGE) != GYR_RANGE_1000DPS) { failure_ = "gyr readback"; return false; }
+  if (readReg(ERR_REG) != 0x00) { failure_ = "err_reg"; return false; }
+  if ((readReg(PMU_STATUS) & 0x3C) != 0x14) { failure_ = "pmu status"; return false; }
+  return true;
 }
 
 bool Bmi160::read(int16_t acc[3], int16_t gyr[3]) {

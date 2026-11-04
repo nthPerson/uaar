@@ -12,6 +12,8 @@ class Bmi160 {
   // Reset, configure and power up. Returns false if CHIP_ID is wrong or the configuration
   // does not read back as written. Call describe() afterwards for the register values.
   bool begin(TwoWire& wire, uint8_t address);
+  // Why the last begin() failed: "" when it succeeded.
+  const char* failure() const { return failure_; }
   // One 12-byte burst: gyro x,y,z then accel x,y,z. Returns false on an I2C error.
   bool read(int16_t acc[3], int16_t gyr[3]);
   // Human-readable register dump for the boot banner.
@@ -34,4 +36,5 @@ class Bmi160 {
 
   TwoWire* wire_ = nullptr;
   uint8_t addr_ = 0;
+  const char* failure_ = "";
 };

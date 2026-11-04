@@ -92,7 +92,9 @@ void printBanner() {
   Serial.printf("# rate=%u Hz odr=%u Hz acc=%d LSB/g gyr=%.1f LSB/dps sample=%u B batch=%u B\n",
                 UAAR_SAMPLE_RATE_HZ, UAAR_IMU_ODR_HZ, UAAR_ACC_LSB_PER_G, UAAR_GYR_LSB_PER_DPS,
                 (unsigned)sizeof(UaarSample), (unsigned)sizeof(UaarBatch));
-  Serial.printf("# bmi160 %s %s\n", imu_ok ? "ok" : "NOT FOUND", imu_ok ? imu.describe().c_str() : "");
+  if (imu_ok) Serial.printf("# bmi160 ok %s\n", imu.describe().c_str());
+  else if (imu.address()) Serial.printf("# bmi160 FAILED (%s) %s\n", imu.failure(), imu.describe().c_str());
+  else Serial.println("# bmi160 NOT FOUND (no I2C device at 0x68/0x69)");
   Serial.printf("# gyro bias %s (%ld,%ld,%ld) LSB\n", calibrated ? "applied" : "none",
                 (long)gyr_bias[0], (long)gyr_bias[1], (long)gyr_bias[2]);
   Serial.printf("# session %s id=%u seq=%u imu_errors=%lu\n", session_active ? "active" : "idle",
