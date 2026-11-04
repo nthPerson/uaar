@@ -42,7 +42,9 @@ MASTER_DEVICE = "rightArm"
 # Labels that are not movements of interest (device taps, band adjustment, notes). Matched as
 # case-insensitive substrings of the activity name. Finalized after the label list is printed
 # (development-spec §12); until then this list is a placeholder.
-JUNK_LABEL_PATTERNS: tuple[str, ...] = ("tap", "adjust", "note", "junk")
+# Names seen in the multi-activity file on 2026-11-03: "Tap Left Device", "Tap Right Device",
+# "Device on Table", "<Initial Activity>". "Non-Exercise" (idle) and "Unlisted Exercise" are kept.
+JUNK_LABEL_PATTERNS: tuple[str, ...] = ("tap ", "device on table", "initial activity", "adjust")
 
 
 def is_junk(label: str) -> bool:
@@ -95,6 +97,16 @@ def _str(x) -> str:
     return "" if x is None else str(x)
 
 
+def _subject_table(mat: dict) -> np.ndarray:
+    """``subject_data`` as a 2-D (subjects x columns) object array.
+
+    ``squeeze_me`` turns the multi file's (94, 1) cell matrix into a 1-D array of 94 cells, so a
+    1-D array means one column per subject, never one row.
+    """
+    sd = np.asarray(mat["subject_data"], dtype=object)
+    return sd.reshape(-1, 1) if sd.ndim == 1 else sd
+
+
 def activity_names(mat: dict) -> list[str]:
     """The 75 activity labels in column order of the single-activity ``subject_data``."""
     acts = mat["exerciseConstants"].activities
@@ -125,7 +137,7 @@ def load_single(path: Path, subjects: slice | None = None) -> Iterator[Recording
     """One Recording per (subject, activity, instance) from the single-activity file."""
     mat = _mat(path)
     names = activity_names(mat)
-    table = np.atleast_2d(mat["subject_data"])
+    table = _subject_table(mat)
     rows = range(table.shape[0])[subjects] if subjects else range(table.shape[0])
     for i in rows:
         for j, cell in enumerate(table[i]):
@@ -173,7 +185,7 @@ def load_multi(path: Path, subjects: slice | None = None) -> Iterator[Recording]
     (``accelDataMatrix[:, 0]``), so they are compared against that column, not the re-zeroed ``t``.
     """
     mat = _mat(path)
-    table = np.atleast_2d(mat["subject_data"])
+    table = _subject_table(mat)
     rows = range(table.shape[0])[subjects] if subjects else range(table.shape[0])
     for i in rows:
         for v, rec in enumerate(_structs(table[i, 0])):
