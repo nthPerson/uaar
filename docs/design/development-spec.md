@@ -187,13 +187,15 @@ Common interface **(decision)**:
 ```python
 @dataclass
 class Prediction:
-    probs: np.ndarray            # (N, K) predictive probabilities (p̂ for EDL, p̄ for MC Dropout)
-    label: np.ndarray            # (N,) argmax
+    probs: np.ndarray  # (N, K) predictive probabilities (p̂ for EDL, p̄ for MC Dropout)
+    label: np.ndarray  # (N,) argmax
     scores: dict[str, np.ndarray]  # higher = more uncertain; keys listed per method below
+
 
 class Method(Protocol):
     name: str
     score_names: list[str]
+
     def fit(self, Xtr, ytr, Xval, yval, cfg: Config, run_dir: Path) -> None: ...
     def predict(self, X, cfg: Config) -> Prediction: ...
     def save(self, run_dir: Path) -> None: ...

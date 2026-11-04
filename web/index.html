@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>UAAR Wearable Console</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- ---- Header: connection + device status ------------------------------------------- -->
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-name">UAAR</span>
+      <span class="brand-sub">uncertainty-aware exercise recognition, wrist IMU</span>
+    </div>
+    <div class="conn-controls">
+      <button id="btn-connect" class="primary">Connect wearable</button>
+      <button id="btn-reconnect" hidden>Reconnect</button>
+      <button id="btn-disconnect" disabled>Disconnect</button>
+      <button id="btn-simulate">Simulate</button>
+      <span id="ble-state" class="pill pill-muted">not connected</span>
+    </div>
+  </header>
+
+  <section class="statusbar" id="status-panel">
+    <div class="stat"><span class="k">device</span><span class="v" id="st-name">-</span></div>
+    <div class="stat"><span class="k">firmware</span><span class="v" id="st-fw">-</span></div>
+    <div class="stat"><span class="k">uptime</span><span class="v" id="st-uptime">-</span></div>
+    <div class="stat"><span class="k">calibrated</span><span class="v" id="st-cal">-</span></div>
+    <div class="stat"><span class="k">session id</span><span class="v" id="st-sid">-</span></div>
+    <div class="stat"><span class="k">packets/s</span><span class="v" id="st-pps">0</span></div>
+    <div class="stat"><span class="k">samples/s</span><span class="v" id="st-sps">0</span></div>
+    <div class="stat"><span class="k">dropped</span><span class="v" id="st-dropped">0</span></div>
+    <div class="stat"><span class="k">button</span><span class="v"><span id="st-button" class="pill pill-muted">released</span></span></div>
+    <div class="stat session-stat">
+      <span id="session-indicator" class="session-indicator idle">SESSION IDLE</span>
+    </div>
+  </section>
+
+  <main class="layout">
+    <!-- ---- Left column: live charts + commands + record --------------------------------- -->
+    <div class="col col-left">
+      <section class="card">
+        <h2>Accelerometer (g), last 10 s
+          <span class="legend"><i style="--c: var(--ax)"></i>ax <i style="--c: var(--ay)"></i>ay <i style="--c: var(--az)"></i>az <i style="--c: var(--amag)"></i>|a|</span>
+        </h2>
+        <canvas id="chart-acc" height="220"></canvas>
+      </section>
+      <section class="card">
+        <h2>Gyroscope (deg/s), last 10 s
+          <span class="legend"><i style="--c: var(--ax)"></i>gx <i style="--c: var(--ay)"></i>gy <i style="--c: var(--az)"></i>gz</span>
+        </h2>
+        <canvas id="chart-gyr" height="220"></canvas>
+      </section>
+
+      <section class="card">
+        <h2>Commands</h2>
+        <div class="btn-row">
+          <button class="cmd" data-cmd="ping">Ping</button>
+          <button class="cmd" data-cmd="start">Start session</button>
+          <button class="cmd" data-cmd="stop">Stop session</button>
+          <button class="cmd" data-cmd="calibrate">Calibrate</button>
+          <button class="cmd" data-cmd="led_known">LED known</button>
+          <button class="cmd" data-cmd="led_unknown">LED unknown</button>
+          <button class="cmd" data-cmd="identify">Identify</button>
+        </div>
+      </section>
+
+      <section class="card" id="record-panel">
+        <h2>Record <span id="rec-state" class="pill pill-muted">off</span></h2>
+        <div class="form-grid">
+          <label>Label for next set <input id="rec-label" type="text" placeholder="e.g. bicep_curl" autocomplete="off"></label>
+          <label>Subject <input id="rec-subject" type="text" placeholder="W01" autocomplete="off"></label>
+          <label>Session <input id="rec-session" type="text" autocomplete="off"></label>
+          <label>Placement <input id="rec-placement" type="text" value="left wrist, case arrow toward the elbow"></label>
+          <label class="wide">Note <input id="rec-note" type="text" placeholder="optional" autocomplete="off"></label>
+        </div>
+        <div class="btn-row">
+          <button id="btn-record" class="primary">Start recording</button>
+          <button id="btn-download" disabled>Download session</button>
+          <button id="btn-clear" disabled>Clear</button>
+          <span id="rec-summary" class="muted">no samples</span>
+        </div>
+        <table class="sets" id="sets-table">
+          <thead><tr><th>#</th><th>label</th><th>session</th><th>seconds</th><th>samples</th><th>dropped</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </section>
+    </div>
+
+    <!-- ---- Right column: live prediction panel ------------------------------------------- -->
+    <div class="col col-right">
+      <section class="card prediction-card">
+        <h2>Live prediction</h2>
+        <div class="ws-row">
+          <input id="ws-url" type="text" value="ws://localhost:8765" spellcheck="false">
+          <button id="btn-ws">Connect</button>
+          <span id="ws-state" class="pill pill-muted">backend not connected</span>
+        </div>
+        <div id="ws-status" class="ws-status muted"></div>
+        <div id="pred-methods" class="pred-methods">
+          <div class="pred-empty" id="pred-empty">backend not connected</div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Log</h2>
+        <pre id="log" class="log"></pre>
+      </section>
+    </div>
+  </main>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

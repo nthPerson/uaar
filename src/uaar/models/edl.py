@@ -138,6 +138,7 @@ def kl_anneal(epoch: int, anneal_epochs: int = 10) -> float:
 
 
 __all__ = [
+    "EDLMethod",
     "EDLNet",
     "edl_loss",
     "edl_loss_digamma",
@@ -146,3 +147,130 @@ __all__ = [
     "evidence_from_logits",
     "kl_anneal",
 ]
+
+
+class EDLMethod:
+    """The Method interface for EDL (fit / predict / save / load), mirroring SoftmaxMethod."""
+
+    name = "edl"
+    score_names = ["vacuity", "one_minus_max"]
+
+    def __init__(
+        self,
+        n_classes: int,
+        classes: list[str],
+        dropout: float = 0.3,
+        evidence: Evidence = "softplus",
+        loss: str = "mse",
+        kl_anneal_epochs: int = 10,
+        seed: int = 0,
+    ):
+        self.classes = classes
+        self.seed = seed
+        self.loss_kind = loss
+        self.kl_anneal_epochs = kl_anneal_epochs
+        self.model = EDLNet(n_classes, dropout=dropout, evidence=evidence)
+        self.stats: dict | None = None
+        self.history = None
+
+    def fit(self, Xtr, ytr, Xval, yval, cfg, run_dir) -> None:
+        import numpy as np
+
+        from uaar.models import normalize
+        from uaar.models.base import class_weights
+        from uaar.models.train_loop import device_for, fit
+
+        self.stats = normalize.fit_stats(Xtr)
+        Xtr_n, Xval_n = normalize.apply(Xtr, self.stats), normalize.apply(Xval, self.stats)
+        device = device_for()
+        K = len(self.classes)
+        w = torch.from_numpy(class_weights(ytr, K, cfg.train.class_weighting)).to(device)
+        loss_core = edl_loss if self.loss_kind == "mse" else edl_loss_digamma
+
+        def loss_fn(alpha, y, epoch):
+            y1 = F.one_hot(y, K).to(alpha.dtype)
+            return loss_core(
+                alpha, y1, lam=kl_anneal(epoch, self.kl_anneal_epochs), class_weights=w
+            )
+
+        self.history = fit(
+            self.model,
+            loss_fn,
+            lambda a: a / a.sum(dim=1, keepdim=True),
+            Xtr_n,
+            ytr,
+            Xval_n,
+            np.asarray(yval),
+            epochs=cfg.train.epochs,
+            batch_size=cfg.train.batch_size,
+            lr=cfg.train.lr,
+            weight_decay=cfg.train.weight_decay,
+            patience=cfg.train.patience,
+            num_workers=cfg.train.num_workers,
+            device=device,
+            extra_columns=lambda e: {"lambda_t": kl_anneal(e, self.kl_anneal_epochs)},
+        )
+        self.history.write(run_dir / "history.csv")
+
+    def predict(self, X, cfg=None):
+        from uaar.models import normalize
+        from uaar.models.base import Prediction
+        from uaar.models.train_loop import predict_batches
+
+        assert self.stats is not None, "fit or load first"
+        alpha = predict_batches(self.model, normalize.apply(X, self.stats))
+        s = dirichlet_summary(alpha)
+        probs = s["probs"].numpy()
+        return Prediction(
+            probs=probs,
+            label=probs.argmax(axis=1),
+            scores={
+                "vacuity": s["vacuity"].numpy(),
+                "one_minus_max": s["one_minus_max"].numpy(),
+            },
+        )
+
+    def save(self, run_dir) -> None:
+        import json
+
+        from uaar.models import normalize
+
+        run_dir.mkdir(parents=True, exist_ok=True)
+        torch.save(self.model.state_dict(), run_dir / "model.pt")
+        conf = {
+            **self.model.config(),
+            "classes": self.classes,
+            "seed": self.seed,
+            "method": self.name,
+            "loss": self.loss_kind,
+            "kl_anneal_epochs": self.kl_anneal_epochs,
+        }
+        (run_dir / "config.json").write_text(json.dumps(conf, indent=2))
+        normalize.save(
+            self.stats or {},
+            run_dir / "preprocess.json",
+            window_samples=100,
+            sample_rate_hz=50,
+            channels=["ax", "ay", "az", "gx", "gy", "gz"],
+        )
+
+    @classmethod
+    def load(cls, run_dir):
+        import json
+
+        from uaar.models import normalize
+
+        conf = json.loads((run_dir / "config.json").read_text())
+        m = cls(
+            conf["n_classes"],
+            conf["classes"],
+            dropout=conf["dropout"],
+            evidence=conf["evidence"],
+            loss=conf.get("loss", "mse"),
+            kl_anneal_epochs=conf.get("kl_anneal_epochs", 10),
+            seed=conf.get("seed", 0),
+        )
+        m.model.load_state_dict(torch.load(run_dir / "model.pt", map_location="cpu"))
+        m.model.eval()
+        m.stats = normalize.load(run_dir / "preprocess.json")
+        return m
