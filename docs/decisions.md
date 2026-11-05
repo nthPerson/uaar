@@ -27,3 +27,38 @@ Kept: "Non-Exercise" and "Rest" as the non-exercise set (P1-b), never as classes
 (`split.nonexercise_labels`); "Unlisted Exercise" (4 subjects, never eligible) and "Walk" as
 ordinary labels for now. The eligibility thresholds are still the spec defaults; the counts per
 alternative are in `data-pipeline.md` and the decision is item 4.4.
+
+## 2026-11-04
+
+**RecoFit exercise windows come from the single file only (bug fix).** The single-exercise file
+is a copy of the labelled segments of the multi-activity file (65 of 68 labels have identical
+sample counts in both; one recording compared bit for bit), and the first pipeline run took
+class windows from both, so every exercise sample was counted twice. There was no subject
+leakage (splits are by subject), but per-class minutes and training time were doubled. New
+config key `split.class_source: single`, stored in each split file and honoured by
+`splits.select` and `splits.eligible_classes`; the non-exercise set still comes from the multi
+file. This is what `design/datasets.md` §1 specified. Unique data: 132,787 exercise windows.
+Split files written before this date have no `class_source` and select from both sources; they
+are regenerated with the eligibility decision. Updated: `data-pipeline.md` (tables in unique
+minutes), `design/development-spec.md` §3.3.
+
+**MC Dropout shares the convolutional trunk across passes.** The backbone's only Dropout layers
+sit after the global pooling, so the T stochastic passes differ only in the two-layer head.
+`MCDropoutMethod` computes the convolutional features once per batch and repeats the head T
+times by default (`share_trunk=True`); `share_trunk=False` runs the full network T times with
+identical outputs. Consequence for Q3: with this backbone MC Dropout does not cost T full
+passes (2.8 s against 19.2 s for the fold-0 test windows at T = 30; softmax 1.3 s), so the cost
+comparison with EDL must report both the general T-pass cost and the shared-trunk cost.
+To confirm with Sirena (owner of M4).
+
+**Evaluation and logistic regression: where the code differs from the spec's wording.**
+(1) Logistic regression has 102 features, not "about 90" (the spec's own list gives 8 x 12 + 6).
+(2) C is chosen with an explicit `GroupKFold` loop over a warm-started C path instead of
+`GridSearchCV` (same model, scoring and refit; about three times faster). (3) `metrics.json`
+holds the score-independent metrics (closed-set, calibration) once under `test_known` and the
+per-score metrics under `scores`; the layout is documented in `uaar/eval/runner.py`.
+(4) Standard AURC is 0 only when there are no errors, so the spec's "AURC of a perfect ranking
+= 0" test is done on the excess AURC (`eaurc`), which is also reported. (5) `train.py` now
+passes the training subjects to methods whose `fit` accepts `groups`, and indexes windows by
+row position instead of assuming `window_id` equals the row. (6) No `uaar.mplstyle` file; the
+plot style is a dict in `uaar/eval/plots.py`.

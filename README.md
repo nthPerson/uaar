@@ -8,7 +8,7 @@ recognizer say "I don't know" (logistic regression, a softmax network, evidentia
 learning and Monte Carlo dropout) on public IMU datasets, then runs the result live on our own
 wearable (XIAO ESP32-S3 + BMI160).
 
-Status (2026-11-03): repository bootstrapped; firmware v0.1.0 flashed and verified on kit K1; serial recorder, browser page and live backend working with a placeholder predictor; data pipeline and the softmax/EDL methods implemented and tested on synthetic data; the RecoFit run is next.
+Status (2026-11-04): firmware v0.1.0 flashed and verified on kit K1; serial recorder, browser page and live backend working with a placeholder predictor; RecoFit pipeline run on the real data; all four methods and the evaluation scripts implemented and tested, with two-epoch smoke runs only; the class-eligibility decision and the full fold-0 runs are next.
 
 ## Layout
 
@@ -34,8 +34,11 @@ uv run pytest                          # synthetic data only, no downloads neede
 uv run scripts/prepare_data.py recofit --steps recordings windows splits
 uv run scripts/prepare_data.py recofit --steps labels     # per-label minutes and subjects
 
-# one training run
+# one training run, its evaluation, MC Dropout on top of a softmax run, the summary table
 uv run scripts/train.py --config configs/p1/edl.yaml --fold 0 --class-split rand0 --seed 0
+uv run scripts/evaluate.py reports/runs/p1_recofit_edl_fold0_rand0_seed0
+uv run scripts/evaluate.py --method mcdropout --from reports/runs/p1_recofit_softmax_fold0_rand0_seed0
+uv run scripts/make_tables.py
 
 # wearable
 firmware/tools/attach-xiao.sh                                   # WSL: hand the USB port to Linux
