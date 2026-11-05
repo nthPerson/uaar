@@ -92,6 +92,7 @@ def step_splits(dataset: str, p: dict, cfg: Config, force: bool, near_file: Path
             dataset=dataset,
             hop_s=cfg.data.hop_s,
             exclude=cfg.get("split.nonexercise_labels", []) or [],
+            class_source=cfg.get("split.class_source"),
         )
     first = json.loads(written[0].read_text())
     n_eligible = len(first["known_classes"]) + len(first["unknown_classes"])
@@ -118,7 +119,21 @@ def step_features(dataset: str, p: dict, force: bool) -> None:
     print(f"features: {df.shape}")
 
 
-def print_labels(p: dict) -> None:
+def print_labels(dataset: str, p: dict, cfg: Config) -> None:
+    """Per-label table from the windows, as eligibility counts them; else from the recordings."""
+    if p["windows_meta"].exists():
+        import pandas as pd
+
+        _, meta = registry.load_windows(dataset)
+        t = splits.label_table(
+            meta,
+            hop_s=cfg.data.hop_s,
+            class_source=cfg.get("split.class_source"),
+            nonexercise=cfg.get("split.nonexercise_labels", []) or [],
+        )
+        with pd.option_context("display.max_rows", None, "display.width", 140):
+            print(t.to_string(index=False, float_format=lambda x: f"{x:.1f}"))
+        return
     from uaar.data.recofit import print_label_table
 
     print_label_table(p["recordings_meta"])
@@ -147,7 +162,7 @@ def main() -> None:
     p = registry.paths(args.dataset)
     steps = STEPS if "all" in args.steps else args.steps
     if "labels" in args.steps:
-        print_labels(p)
+        print_labels(args.dataset, p, cfg)
         return
     for s in steps:
         print(f"== {s}")

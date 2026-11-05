@@ -148,6 +148,7 @@ def test_write_splits_files_and_schema(written):
         "known_classes",
         "unknown_classes",
         "eligibility",
+        "class_source",
         "created_by",
     ]
     assert d["dataset"] == "recofit"
@@ -251,3 +252,54 @@ def test_eligible_classes_exclude():
     )
     assert sp.eligible_classes(meta, 2, 0.1) == ["Curl", "Non-Exercise"]
     assert sp.eligible_classes(meta, 2, 0.1, exclude=["Non-Exercise"]) == ["Curl"]
+
+
+def test_class_source_restricts_eligibility_and_selection(meta, tmp_path):
+    # Duplicate every exercise window under source "multi", as RecoFit's two files do.
+    ex = meta[meta["label"].isin(CLASSES)]
+    dup = ex.assign(source="multi", recording_id="multi/" + ex["subject"])
+    both = pd.concat([meta, dup], ignore_index=True)
+    both["window_id"] = np.arange(len(both), dtype=np.int64)
+
+    # "Short" has 2.1 min per source: counting both sources doubles it, to 4.2 min.
+    assert "Short" in sp.eligible_classes(both, 20, 4.0)
+    assert "Short" not in sp.eligible_classes(both, 20, 4.0, source="single")
+    assert sp.eligible_classes(both, 20, 5.0, source="single") == sp.eligible_classes(meta, 20, 5.0)
+
+    kw = dict(n_folds=5, class_split_seeds=(0,), min_subjects=20, min_minutes=5.0)
+    single = sp.load_split(
+        sp.write_splits(both, tmp_path / "a" / "splits", class_source="single", **kw)[0]
+    )
+    anysrc = sp.load_split(sp.write_splits(both, tmp_path / "b" / "splits", **kw)[0])
+    assert single.class_source == "single" and anysrc.class_source is None
+    assert (
+        json.loads((tmp_path / "a" / "splits" / "fold0_rand0.json").read_text())["class_source"]
+        == "single"
+    )
+    by_id = both.set_index("window_id")
+    for part in sp.PARTS:
+        ids = sp.select(both, single, part)
+        assert len(ids) > 0 and (by_id.loc[ids, "source"] == "single").all()
+        assert len(sp.select(both, anysrc, part)) == 2 * len(ids)
+    # the non-exercise set is still taken from the multi source
+    nonex = sp.select_nonexercise(both, single, NONEX)
+    assert (by_id.loc[nonex, "source"] == "multi").all()
+
+
+def test_split_file_without_class_source_loads_as_unrestricted(written):
+    d = json.loads(written[0].read_text())
+    d.pop("class_source", None)
+    assert sp.Split.from_dict(d).class_source is None
+
+
+def test_label_table_counts_one_source(meta):
+    ex = meta[meta["label"].isin(CLASSES)]
+    both = pd.concat([meta, ex.assign(source="multi")], ignore_index=True)
+    t = sp.label_table(both, class_source="single", nonexercise=NONEX).set_index("label")
+    assert t.loc["Curl", "windows"] == 25 * 40 and t.loc["Curl", "subjects"] == 25
+    assert t.loc["Jump", "minutes"] == pytest.approx(5.0)
+    assert t.loc["Curl", "set"] == "class" and t.loc["Rest", "set"] == "nonexercise"
+    assert t.loc["Rest", "windows"] == 25 * 3  # the multi rows only
+    doubled = sp.label_table(both, nonexercise=NONEX).set_index("label")
+    assert doubled.loc["Curl", "windows"] == 2 * 25 * 40
+    assert list(t["minutes"]) == sorted(t["minutes"], reverse=True)

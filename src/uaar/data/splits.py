@@ -15,6 +15,11 @@ Design choices where the spec is open:
   honours ``seed``. Validation subjects are then drawn from each fold's training subjects with
   the same generator.
 * The ``near`` split has no seed; its ``class_split_seed`` is stored as ``null``.
+* **Class source.** RecoFit's single-exercise file is a copy of the labelled segments of its
+  multi-activity file, so taking exercise windows from both sources would count every sample
+  twice. ``class_source`` (``"single"`` for RecoFit) restricts eligibility counts and the
+  train/val/test_known/test_unknown selections to one ``source``; ``None`` means no restriction.
+  The non-exercise set always comes from ``source == "multi"``.
 """
 
 from __future__ import annotations
@@ -50,6 +55,7 @@ class Split:
     known_classes: list[str]
     unknown_classes: list[str]
     eligibility: dict = field(default_factory=dict)
+    class_source: str | None = None
     created_by: str = "unknown"
 
     @property
@@ -84,6 +90,7 @@ def eligible_classes(
     min_minutes: float,
     hop_s: float = 1.0,
     exclude: Iterable[str] = (),
+    source: str | None = None,
 ) -> list[str]:
     """Labels with enough subjects and enough windowed minutes to be a known or unknown class.
 
@@ -95,18 +102,58 @@ def eligible_classes(
         hop_s: Hop used when the windows were made, in seconds.
         exclude: Labels that are never classes, such as the non-exercise labels that form the
             separate P1-b test set (``Non-Exercise``, ``Rest``).
+        source: Count only windows with this ``source`` value (``None``: all windows).
 
     Returns:
         Sorted list of eligible label strings (``""`` is never eligible).
     """
     excluded = {""} | set(exclude)
     labelled = meta[~meta["label"].astype(str).isin(excluded)]
+    if source is not None:
+        labelled = labelled[labelled["source"].astype(str) == source]
     stats = labelled.groupby("label").agg(
         n_subjects=("subject", "nunique"), n_windows=("subject", "size")
     )
     minutes = stats["n_windows"] * hop_s / 60.0
     ok = (stats["n_subjects"] >= min_subjects) & (minutes >= min_minutes)
     return sorted(str(c) for c in stats.index[ok])
+
+
+def label_table(
+    meta: pd.DataFrame,
+    hop_s: float = 1.0,
+    class_source: str | None = None,
+    nonexercise: Iterable[str] = (),
+) -> pd.DataFrame:
+    """Per-label windows, minutes and subjects as the eligibility rule counts them (T1 input).
+
+    Args:
+        meta: Window metadata (spec §3.2).
+        hop_s: Hop used when the windows were made, in seconds.
+        class_source: ``source`` that class windows are taken from (``None``: all).
+        nonexercise: Labels of the non-exercise set; these are counted in ``source == "multi"``.
+
+    Returns:
+        Frame with ``label``, ``minutes`` (``windows * hop_s / 60``), ``subjects``, ``windows``
+        and ``set`` (``class`` or ``nonexercise``), sorted by minutes, largest first.
+    """
+    nonex = set(nonexercise)
+    src = meta["source"].astype(str)
+    lab = meta["label"].astype(str)
+    is_nonex = lab.isin(nonex)
+    keep = (is_nonex & (src == "multi")) | (
+        ~is_nonex & (lab != "") & ((src == class_source) if class_source is not None else True)
+    )
+    t = (
+        meta[keep]
+        .groupby("label")
+        .agg(subjects=("subject", "nunique"), windows=("subject", "size"))
+        .reset_index()
+    )
+    t["minutes"] = t["windows"] * hop_s / 60.0
+    t["set"] = np.where(t["label"].isin(nonex), "nonexercise", "class")
+    t = t.sort_values(["minutes", "label"], ascending=[False, True]).reset_index(drop=True)
+    return t[["label", "minutes", "subjects", "windows", "set"]]
 
 
 def make_class_split(
@@ -219,6 +266,7 @@ def write_splits(
     dataset: str | None = None,
     hop_s: float = 1.0,
     exclude: Iterable[str] = (),
+    class_source: str | None = None,
 ) -> list[Path]:
     """Write every ``fold{k}_{classsplit}.json`` for a dataset (spec §3.3).
 
@@ -234,6 +282,9 @@ def write_splits(
         fold_seed: Seed for :func:`make_subject_folds`.
         dataset: Dataset name stored in the files; defaults to ``out_dir.parent.name``.
         hop_s: Hop used for the windows, for the minutes count.
+        exclude: Labels that are never classes (the non-exercise labels).
+        class_source: ``source`` value that class windows are taken from (see the module
+            docstring); stored in every split file and honoured by :func:`select`.
 
     Returns:
         Paths of the written files, in ``(fold, class split)`` order.
@@ -241,7 +292,9 @@ def write_splits(
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     dataset = dataset or out_dir.resolve().parent.name
-    classes = eligible_classes(meta, min_subjects, min_minutes, hop_s=hop_s, exclude=exclude)
+    classes = eligible_classes(
+        meta, min_subjects, min_minutes, hop_s=hop_s, exclude=exclude, source=class_source
+    )
     if len(classes) < 2:
         raise ValueError(f"only {len(classes)} eligible classes; relax the thresholds")
 
@@ -270,6 +323,7 @@ def write_splits(
                 known_classes=known,
                 unknown_classes=unknown,
                 eligibility={"min_subjects": int(min_subjects), "min_minutes": float(min_minutes)},
+                class_source=class_source,
                 created_by=sha,
             )
             path = out_dir / f"{split.split_id}.json"
@@ -292,7 +346,8 @@ def select(meta: pd.DataFrame, split: Split, part: Part) -> np.ndarray:
         split: The split.
         part: ``"train"`` / ``"val"``: that fold's subjects, known classes only.
             ``"test_known"``: test subjects, known classes. ``"test_unknown"``: test subjects,
-            unknown classes.
+            unknown classes. When ``split.class_source`` is set, only windows with that
+            ``source`` are returned.
 
     Returns:
         int64 array of ``window_id`` values in ``meta`` order.
@@ -307,6 +362,8 @@ def select(meta: pd.DataFrame, split: Split, part: Part) -> np.ndarray:
     }[part]
     classes = split.unknown_classes if part == "test_unknown" else split.known_classes
     mask = meta["subject"].astype(str).isin(subjects) & meta["label"].astype(str).isin(classes)
+    if split.class_source is not None:
+        mask &= meta["source"].astype(str) == split.class_source
     return meta.loc[mask, "window_id"].to_numpy(dtype=np.int64)
 
 

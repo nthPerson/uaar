@@ -31,97 +31,127 @@ First run 2026-11-03 (`recordings` 55 s, `windows` 96 s, `splits` 0.1 s on the T
 | windows | 473,859 kept, 48,192 dropped by the 80 % purity rule; `X.npy` is 1.1 GB |
 | splits | 5 folds x 3 random class splits with the spec defaults (20 subjects, 5 min): **52 eligible classes**, 39 known / 13 unknown per split; `Non-Exercise` and `Rest` are excluded from the class pool (`split.nonexercise_labels`) and form the P1-b set |
 
-### Labels (from `recordings.meta.json`, after junk removal)
+The window count above includes both copies of the exercise data; see the next section.
+
+### The two files hold the same exercise data (found 2026-11-04)
+
+The single-exercise file is a copy of the labelled segments of the multi-activity file: 65 of
+the 68 labels have exactly the same number of samples in both sources (`Non-Exercise` differs by
+4 samples, `Walk` by 1, and the unlabelled stretches exist only in the multi file), and a
+200-sample stretch of one recording compared bit for bit matched exactly. Taking exercise windows from both sources, as the first run did,
+counts every sample twice (no subject leakage, since splits are by subject, but double the
+minutes and double the training time). Since 2026-11-04 `split.class_source: single` restricts
+class eligibility and the train/val/test selections to the single file, as
+[design/datasets.md §1](design/datasets.md#1-recofit-primary) intended; the non-exercise set
+(P1-b) still comes from the multi file. Unique data: 132,787 exercise windows (single) and
+104,171 non-exercise windows (multi).
+
+### Labels (from the windows, one source each; `prepare_data.py recofit --steps labels`)
+
+Minutes are `windows x hop / 60`, the quantity the eligibility rule uses.
 
 | Label | Minutes | Subjects | Windows |
 |---|---|---|---|
-| Non-Exercise | 3492.2 | 94 | 203803 |
-| (unlabelled) | 726.4 | 94 | 0 |
-| Walk | 405.5 | 25 | 24262 |
-| Static stretch | 300.8 | 37 | 17948 |
-| Running (treadmill) | 239.7 | 21 | 14309 |
-| Elliptical machine | 218.3 | 22 | 13026 |
-| Static Stretch (at your own pace) | 216.4 | 30 | 12899 |
-| Rowing machine | 208.0 | 22 | 12412 |
-| Dynamic Stretch (at your own pace) | 201.1 | 29 | 11986 |
-| Jump Rope | 122.8 | 30 | 7205 |
-| Plank | 105.5 | 61 | 6151 |
-| Butterfly Sit-up | 92.5 | 29 | 5467 |
-| Lunge (alternating both legs, weight optional) | 87.9 | 43 | 5157 |
-| Repetitive Stretching | 82.4 | 16 | 4869 |
-| Wall Squat | 82.3 | 30 | 4767 |
-| Squat (arms in front of body, parallel to ground) | 78.4 | 43 | 4584 |
-| Burpee | 77.4 | 43 | 4520 |
-| Triceps Kickback (knee on bench) (label spans both arms) | 72.2 | 30 | 4249 |
-| Two-arm Dumbbell Curl (both arms, not alternating) | 69.3 | 44 | 4031 |
-| Dumbbell Row (knee on bench) (label spans both arms) | 68.9 | 29 | 4054 |
-| Sit-up (hands positioned behind head) | 68.5 | 43 | 3994 |
-| V-up | 67.9 | 43 | 3954 |
-| Sit-ups | 67.7 | 25 | 3995 |
-| Russian Twist | 67.0 | 33 | 3919 |
-| Dumbbell Squat (hands at side) | 66.4 | 30 | 3898 |
-| Walking lunge | 65.5 | 25 | 3865 |
-| Rest | 65.5 | 9 | 3903 |
-| Crunch | 65.3 | 30 | 3831 |
-| Squat Rack Shoulder Press | 63.3 | 29 | 3711 |
-| Dumbbell Deadlift Row | 60.0 | 25 | 3527 |
-| Bicep Curl | 58.9 | 25 | 3463 |
-| Overhead Triceps Extension | 57.1 | 41 | 3312 |
-| Shoulder Press (dumbbell) | 53.8 | 43 | 3104 |
-| Squat | 51.2 | 25 | 3003 |
-| Dip | 50.6 | 44 | 2910 |
-| Fast Alternating Punches | 50.6 | 30 | 2936 |
-| Triceps extension (lying down) | 50.3 | 22 | 2941 |
-| Seated Back Fly | 49.3 | 30 | 2858 |
-| Medicine Ball Slam | 47.2 | 22 | 2751 |
-| Kettlebell Swing | 46.8 | 30 | 2722 |
-| Lateral Raise | 46.8 | 30 | 2713 |
-| Chest Press (rack) | 44.6 | 21 | 2595 |
-| Pushup (knee or foot variation) | 40.8 | 44 | 2328 |
-| Biceps Curl (band) | 40.7 | 22 | 2370 |
-| Squat (kettlebell / goblet) | 40.0 | 21 | 2333 |
-| Band Pull-Down Row | 39.9 | 21 | 2319 |
-| Squat (hands behind head) | 39.2 | 21 | 2284 |
-| Side Plank Left side | 37.3 | 25 | 2171 |
-| Power Boat pose | 37.3 | 25 | 2166 |
-| Side Plank Right side | 36.9 | 25 | 2143 |
-| Squat Jump | 36.8 | 25 | 2140 |
-| Wall Ball | 36.1 | 23 | 2091 |
-| Lawnmower (right arm) | 35.5 | 21 | 2062 |
-| Lawnmower (left arm) | 33.0 | 21 | 1920 |
-| Pushups | 24.2 | 25 | 1383 |
-| Jumping Jacks | 24.1 | 25 | 1380 |
-| Unlisted Exercise | 15.1 | 4 | 867 |
-| Triceps Kickback (knee on bench) (right arm) | 14.5 | 14 | 830 |
-| Dumbbell Row (knee on bench) (right arm) | 14.1 | 15 | 808 |
-| Dumbbell Row (knee on bench) (left arm) | 13.2 | 15 | 749 |
-| Triceps Kickback (knee on bench) (left arm) | 13.2 | 13 | 750 |
-| Box Jump (on bench) | 5.8 | 3 | 342 |
-| Lawnmower (label spans both arms) | 4.8 | 3 | 281 |
-| Overhead Triceps Extension (label spans both arms) | 4.7 | 2 | 277 |
-| Alternating Dumbbell Curl | 2.4 | 1 | 138 |
-| Triceps extension (lying down) (left arm) | 1.0 | 1 | 57 |
-| Triceps extension (lying down) (right arm) | 0.9 | 1 | 54 |
-| Arm straight up | 0.3 | 1 | 12 |
+| Non-Exercise *(non-exercise set)* | 1703.7 | 94 | 102219 |
+| Walk | 202.1 | 25 | 12128 |
+| Static stretch | 149.5 | 37 | 8970 |
+| Running (treadmill) | 119.1 | 21 | 7148 |
+| Elliptical machine | 108.5 | 22 | 6508 |
+| Static Stretch (at your own pace) | 107.4 | 30 | 6444 |
+| Rowing machine | 103.4 | 22 | 6202 |
+| Dynamic Stretch (at your own pace) | 99.8 | 29 | 5986 |
+| Jump Rope | 59.9 | 30 | 3595 |
+| Plank | 51.0 | 61 | 3061 |
+| Butterfly Sit-up | 45.5 | 29 | 2729 |
+| Lunge (alternating both legs, weight optional) | 42.9 | 43 | 2573 |
+| Repetitive Stretching | 40.5 | 16 | 2430 |
+| Wall Squat | 39.6 | 30 | 2374 |
+| Squat (arms in front of body, parallel to ground) | 38.1 | 43 | 2285 |
+| Burpee | 37.5 | 43 | 2253 |
+| Triceps Kickback (knee on bench) (label spans both arms) | 35.3 | 30 | 2119 |
+| Dumbbell Row (knee on bench) (label spans both arms) | 33.8 | 29 | 2025 |
+| Two-arm Dumbbell Curl (both arms, not alternating) | 33.5 | 44 | 2011 |
+| Sit-ups | 33.2 | 25 | 1993 |
+| Sit-up (hands positioned behind head) | 33.2 | 43 | 1991 |
+| V-up | 32.8 | 43 | 1970 |
+| Rest *(non-exercise set)* | 32.5 | 9 | 1952 |
+| Russian Twist | 32.5 | 33 | 1951 |
+| Dumbbell Squat (hands at side) | 32.4 | 30 | 1944 |
+| Walking lunge | 32.1 | 25 | 1928 |
+| Crunch | 31.9 | 30 | 1911 |
+| Squat Rack Shoulder Press | 30.8 | 29 | 1850 |
+| Dumbbell Deadlift Row | 29.3 | 25 | 1759 |
+| Bicep Curl | 28.8 | 25 | 1729 |
+| Overhead Triceps Extension | 27.5 | 41 | 1649 |
+| Shoulder Press (dumbbell) | 25.7 | 43 | 1543 |
+| Squat | 25.0 | 25 | 1499 |
+| Triceps extension (lying down) | 24.4 | 22 | 1467 |
+| Fast Alternating Punches | 24.4 | 30 | 1464 |
+| Dip | 24.1 | 44 | 1447 |
+| Seated Back Fly | 23.7 | 30 | 1422 |
+| Medicine Ball Slam | 22.8 | 22 | 1369 |
+| Kettlebell Swing | 22.6 | 30 | 1354 |
+| Lateral Raise | 22.5 | 30 | 1351 |
+| Chest Press (rack) | 21.6 | 21 | 1294 |
+| Biceps Curl (band) | 19.7 | 22 | 1181 |
+| Squat (kettlebell / goblet) | 19.4 | 21 | 1165 |
+| Band Pull-Down Row | 19.3 | 21 | 1157 |
+| Pushup (knee or foot variation) | 19.3 | 44 | 1157 |
+| Squat (hands behind head) | 19.0 | 21 | 1138 |
+| Power Boat pose | 18.0 | 25 | 1081 |
+| Side Plank Left side | 18.0 | 25 | 1081 |
+| Side Plank Right side | 17.8 | 25 | 1068 |
+| Squat Jump | 17.8 | 25 | 1065 |
+| Wall Ball | 17.4 | 23 | 1041 |
+| Lawnmower (right arm) | 17.1 | 21 | 1028 |
+| Lawnmower (left arm) | 15.9 | 21 | 953 |
+| Pushups | 11.5 | 25 | 690 |
+| Jumping Jacks | 11.4 | 25 | 685 |
+| Unlisted Exercise | 7.2 | 4 | 433 |
+| Triceps Kickback (knee on bench) (right arm) | 6.9 | 14 | 413 |
+| Dumbbell Row (knee on bench) (right arm) | 6.7 | 15 | 402 |
+| Triceps Kickback (knee on bench) (left arm) | 6.2 | 13 | 374 |
+| Dumbbell Row (knee on bench) (left arm) | 6.2 | 15 | 372 |
+| Box Jump (on bench) | 2.8 | 3 | 170 |
+| Lawnmower (label spans both arms) | 2.3 | 3 | 139 |
+| Overhead Triceps Extension (label spans both arms) | 2.3 | 2 | 138 |
+| Alternating Dumbbell Curl | 1.1 | 1 | 69 |
+| Triceps extension (lying down) (left arm) | 0.5 | 1 | 28 |
+| Triceps extension (lying down) (right arm) | 0.5 | 1 | 27 |
+| Arm straight up | 0.1 | 1 | 6 |
+
+RecoFit is four subject cohorts with almost no overlap, each with its own exercise list: about
+44 subjects (Two-arm Dumbbell Curl, Dip, Burpee, Shoulder Press (dumbbell), ...), 30 (Lateral
+Raise, Jump Rope, Crunch, Kettlebell Swing, ...), 25 (the generic names: Bicep Curl, Squat,
+Sit-ups, Pushups, Jumping Jacks, Walk, ...) and 21 (Running, Elliptical, Rowing, the band and
+rack exercises). The 25-subject cohort's generic labels duplicate better-supported ones in the
+44-subject cohort (`Bicep Curl` / `Two-arm Dumbbell Curl ...`, `Squat` / `Squat (arms in front
+...)`, `Sit-ups` / `Sit-up (hands positioned behind head)`, `Pushups` / `Pushup (knee or foot
+variation)`), which matters for the class splits: a random split can hold out one twin while
+the other is known.
 
 ### Eligibility decision (open, item 4.4)
 
 The spec's defaults keep far more classes than the 10–16 known classes the plan targets. Eligible
-exercise classes (`Non-Exercise` and `Rest` excluded) for other thresholds:
+exercise classes (`Non-Exercise` and `Rest` excluded, single file only) for other thresholds:
 
-| min subjects | >= 5 min | >= 20 min | >= 40 min | >= 60 min |
+| min subjects | >= 5 min | >= 10 min | >= 20 min | >= 30 min |
 |---|---|---|---|---|
 | 20 | 52 | 52 | 38 | 25 |
+| 21 | 52 | 52 | 38 | 25 |
 | 25 | 39 | 39 | 32 | 22 |
 | 29 | 27 | 27 | 26 | 19 |
 | 30 | 23 | 23 | 22 | 15 |
 | 40 | 11 | 11 | 10 | 7 |
+39 52 dropped at 25/10: ['Band Pull-Down Row', 'Biceps Curl (band)', 'Chest Press (rack)', 'Elliptical machine', 'Lawnmower (left arm)', 'Lawnmower (right arm)', 'Medicine Ball Slam', 'Rowing machine', 'Running (treadmill)', 'Squat (hands behind head)', 'Squat (kettlebell / goblet)', 'Triceps extension (lying down)', 'Wall Ball']
+total class windows single: 132787 nonex windows: 104171
 
-Constraints on the choice: the demo exercises must stay eligible (Bicep Curl 25 subjects,
-Jumping Jacks 25, Squat 25, Lateral Raise 30, Shoulder Press (dumbbell) 43), and the `near`
-split needs look-alike pairs (curl variants, squat variants, row variants, sit-up variants).
-Re-run with, for example, `--set split.min_subjects=25 split.min_minutes=20 --force` once decided
-and record the choice in `decisions.md`.
+Constraints on the choice: the demo exercises must stay eligible (Jumping Jacks has 25 subjects
+and only 11.4 minutes; Bicep Curl and Squat 25 subjects; Lateral Raise 30; Shoulder Press
+(dumbbell) 43), and the `near` split needs look-alike pairs (curl variants, squat variants, row
+variants, sit-up variants). Re-run with, for example,
+`--steps splits --set split.min_subjects=25 split.min_minutes=10 --force` once decided and
+record the choice in `decisions.md`.
 
 ## Our wearable
 
