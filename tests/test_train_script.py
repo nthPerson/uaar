@@ -102,3 +102,33 @@ def test_train_script_writes_run_dir(tmp_path):
         assert set(tau) == (
             {"msp", "entropy"} if method == "softmax" else {"vacuity", "one_minus_max"}
         )
+
+
+def test_train_and_evaluate_logreg(tmp_path):
+    """logreg goes through the same scripts: grouped C selection, reload, evaluation."""
+    _make_dataset(tmp_path / "data")
+    env = {**os.environ, "UAAR_DATA_DIR": str(tmp_path / "data")}
+    cmd = [
+        sys.executable, "scripts/train.py", "--config", "configs/p1/logreg.yaml",
+        "--fold", "0", "--class-split", "rand0", "--runs-dir", str(tmp_path / "runs"),
+        "--set", "model.logreg.C_grid=[0.1,1.0]", "model.logreg.n_jobs=1",
+    ]  # fmt: skip
+    out = subprocess.run(cmd, env=env, capture_output=True, text=True)
+    assert out.returncode == 0, out.stderr
+    run_dir = tmp_path / "runs" / "p1_recofit_logreg_fold0_rand0_seed0"
+    for f in ("config.yaml", "split.json", "model.joblib", "config.json", "preprocess.json",
+              "history.csv", "preds_val.parquet", "threshold.json"):  # fmt: skip
+        assert (run_dir / f).exists(), f
+    hist = pd.read_csv(run_dir / "history.csv")
+    assert set(hist["mode"]) == {"group_kfold3"}  # train.py passed the training subjects
+    assert list(hist["C"]) == [0.1, 1.0] and hist["chosen"].sum() == 1
+    preds = pq.read_table(run_dir / "preds_val.parquet").to_pandas()
+    assert (preds["y_pred"] == preds["y_true"]).mean() > 0.9  # classes differ in frequency
+
+    ev = [sys.executable, "scripts/evaluate.py", str(run_dir), "--sets", "test_known",
+          "test_unknown"]  # fmt: skip
+    out = subprocess.run(ev, env=env, capture_output=True, text=True)
+    assert out.returncode == 0, out.stderr
+    m = json.loads((run_dir / "metrics.json").read_text())
+    assert m["method"] == "logreg" and set(m["score_names"]) == {"msp", "entropy"}
+    assert m["test_known"]["closed_set"]["accuracy"] > 0.9
