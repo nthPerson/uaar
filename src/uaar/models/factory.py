@@ -28,7 +28,7 @@ def build(cfg: Config, classes: list[str], seed: int = 0):
             seed=seed,
         )
     if method == "logreg":
-        from uaar.models.logreg import LogRegMethod  # written in item 5.1
+        from uaar.models.logreg import LogRegMethod
 
         return LogRegMethod(K, classes, seed=seed)
     if method == "mcdropout":
@@ -55,4 +55,8 @@ def load(run_dir: Path):
         from uaar.models.logreg import LogRegMethod
 
         return LogRegMethod.load(Path(run_dir))
+    if method == "mcdropout":
+        from uaar.models.mcdropout import MCDropoutMethod
+
+        return MCDropoutMethod.load(Path(run_dir))
     raise ValueError(method)
