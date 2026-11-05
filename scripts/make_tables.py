@@ -22,13 +22,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-#: The one score per method that the headline table reports.
-PRIMARY_SCORE: dict[str, str] = {
-    "softmax": "msp",
-    "logreg": "msp",
-    "edl": "vacuity",
-    "mcdropout": "mi",
-}
+from uaar.models.factory import PRIMARY_SCORE  # the one score per method reported here
+
 METHOD_ORDER = ("logreg", "softmax", "mcdropout", "edl")
 HEADLINE: tuple[tuple[str, str, str], ...] = (
     # (column, where, metric key); where = "known" or "unknown"

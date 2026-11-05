@@ -46,4 +46,8 @@ flowchart LR
 4. The page shows one card per method side by side and a timeline of the last 30 windows.
 5. The page can ask the kit to flash its LED for known/unknown (control characteristic).
 
-Fallback on stage: the page's replay of a recorded session (planned, item 6.5).
+The backend loads trained run directories (`scripts/live_server.py --runs <run_dir> ...`, one
+card per run through `uaar.live.predictors.RunPredictor`, each with its primary score and the τ
+from its `threshold.json`); without `--runs` it serves a motion-energy placeholder.
+
+Fallback on stage: `scripts/live_replay.py` streams a recorded session into the same backend.

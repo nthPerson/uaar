@@ -5,6 +5,7 @@ import json
 import numpy as np
 from fastapi.testclient import TestClient
 
+from uaar.live.predictors import RunPredictor
 from uaar.live.server import make_app
 from uaar.live.windower import LiveWindower
 
@@ -64,3 +65,52 @@ def test_websocket_round_trip():
         )
         pred2 = json.loads(ws.receive_text())
         assert pred2["t_start"] == 1.0
+
+
+def _softmax_run(tmp_path, classes):
+    import torch
+
+    from uaar.models.softmax import SoftmaxMethod
+
+    torch.manual_seed(0)
+    sm = SoftmaxMethod(len(classes), classes)
+    sm.model.eval()
+    sm.stats = {"mean": [0.0] * 6, "std": [1.0] * 6}
+    run = tmp_path / "p1_x_softmax_fold0_rand0_seed0"
+    sm.save(run)
+    (run / "threshold.json").write_text(json.dumps({"tau": {"msp": 0.4, "entropy": 0.9}}))
+    return run
+
+
+def test_run_predictor_wraps_a_run_directory(tmp_path):
+    from uaar.models.mcdropout import MCDropoutMethod
+
+    classes = ["Curl", "Press", "Raise", "Squat", "Jacks", "Row", "Dip"]
+    run = _softmax_run(tmp_path, classes)
+    X = np.random.default_rng(0).normal(0, 1, (6, 100)).astype(np.float32)
+
+    p = RunPredictor(run)
+    assert p.name == "softmax" and p.score_name == "msp" and p.tau == 0.4
+    r = p.predict(X)
+    assert r["label"] in classes and r["label"] == max(r["probs"], key=r["probs"].get)
+    assert len(r["probs"]) == 5 and r["p"] == max(r["probs"].values())
+    assert abs(r["score"] - (1 - r["p"])) < 1e-6
+    assert RunPredictor(run, score="entropy", name="softmax (entropy)").tau == 0.9
+
+    mc = tmp_path / "mc"
+    MCDropoutMethod.from_softmax_run(run, T=5).save(mc)
+    (mc / "threshold.json").write_text(json.dumps({"tau": {"entropy": 1.0, "mi": 0.1}}))
+    q = RunPredictor(mc)
+    assert q.name == "mcdropout" and q.score_name == "mi" and q.predict(X)["score"] >= 0
+
+    client = TestClient(make_app([p, q]))
+    assert client.get("/health").json()["methods"] == ["softmax", "mcdropout"]
+    with client.websocket_connect("/ws") as ws:
+        ws.receive_text()
+        ws.send_text(
+            json.dumps({"type": "samples", "session_id": 1, "samples": _stream(100, moving=True)})
+        )
+        m = json.loads(ws.receive_text())["methods"]
+        assert set(m) == {"softmax", "mcdropout"}
+        for v in m.values():
+            assert v["label"] in classes and v["unknown"] == (v["score"] > v["tau"])

@@ -6,6 +6,14 @@ from pathlib import Path
 
 from uaar.config import Config
 
+#: The one uncertainty score per method that the headline table and the live demo show.
+PRIMARY_SCORE: dict[str, str] = {
+    "softmax": "msp",
+    "logreg": "msp",
+    "edl": "vacuity",
+    "mcdropout": "mi",
+}
+
 
 def build(cfg: Config, classes: list[str], seed: int = 0):
     method = cfg.method

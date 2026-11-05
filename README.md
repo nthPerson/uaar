@@ -46,6 +46,8 @@ uv tool run platformio run -d firmware -t upload --upload-port /dev/ttyACM0
 uv run scripts/record_wearable.py --port /dev/ttyACM0 --subject W01
 uv run scripts/serve_web.py          # browser page on http://localhost:8000 (Chrome/Edge, Web Bluetooth)
 uv run scripts/live_server.py        # live-demo backend on ws://localhost:8765/ws
+uv run scripts/live_server.py --runs reports/runs/<run_id> ...   # one card per trained run
+uv run scripts/live_replay.py data/wearable/W01/<session>        # replay a recording (stage fallback)
 ```
 
 Documentation: [docs/design/](docs/design/) (what and why), [docs/decisions.md](docs/decisions.md) (what changed and when), [docs/wearable-recording.md](docs/wearable-recording.md) (devices, protocol, session log), [firmware/README.md](firmware/README.md), [web/README.md](web/README.md), [docs/ai-use-log.md](docs/ai-use-log.md).
