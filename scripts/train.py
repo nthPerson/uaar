@@ -10,39 +10,24 @@ preprocess.json, history.csv, preds_val.parquet and threshold.json.
 from __future__ import annotations
 
 import argparse
+import inspect
 import json
 import shutil
 import sys
 import time
 from pathlib import Path
 
-import numpy as np
-import pandas as pd
-
 from uaar.config import Config
 from uaar.data import registry, splits
 from uaar.eval import threshold
+from uaar.eval.preds import preds_frame
+from uaar.eval.runner import window_positions
 from uaar.models import factory
 from uaar.utils import git_sha, seed_everything
 
 
 def run_id_for(cfg: Config, split_id: str, seed: int) -> str:
     return f"{cfg.protocol}_{cfg.dataset}_{cfg.method}_{split_id}_seed{seed}"
-
-
-def preds_frame(window_ids: np.ndarray, y_true: np.ndarray, pred) -> pd.DataFrame:
-    df = pd.DataFrame(
-        {
-            "window_id": window_ids,
-            "y_true": y_true,
-            "y_pred": pred.label,
-            "p_max": pred.probs.max(axis=1),
-        }
-    )
-    for name, s in pred.scores.items():
-        df[name] = s
-    df["probs"] = list(pred.probs.astype(np.float32))
-    return df
 
 
 def main() -> int:
@@ -74,8 +59,9 @@ def main() -> int:
     split_path = registry.split_path(cfg.dataset, split_id)
     split = splits.load_split(split_path)
     X, meta = registry.load_windows(cfg.dataset)
-    tr = splits.select(meta, split, "train")
-    va = splits.select(meta, split, "val")
+    # select() returns window ids; X and meta are indexed by row position
+    tr_ids, va_ids = splits.select(meta, split, "train"), splits.select(meta, split, "val")
+    tr, va = window_positions(meta, tr_ids), window_positions(meta, va_ids)
     labels = meta["label"].to_numpy()
     ytr = splits.encode_labels(labels[tr], split)
     yva = splits.encode_labels(labels[va], split)
@@ -91,12 +77,16 @@ def main() -> int:
 
     method = factory.build(cfg, list(split.known_classes), seed=args.seed)
     t0 = time.perf_counter()
-    method.fit(X[tr], ytr, X[va], yva, cfg, run_dir)
+    fit_kwargs = {}
+    if "groups" in inspect.signature(method.fit).parameters:
+        # methods with an inner cross-validation (logreg) fold by training subject
+        fit_kwargs["groups"] = meta["subject"].astype(str).to_numpy()[tr]
+    method.fit(X[tr], ytr, X[va], yva, cfg, run_dir, **fit_kwargs)
     train_s = time.perf_counter() - t0
     method.save(run_dir)
 
     pred = method.predict(X[va], cfg)
-    df = preds_frame(meta["window_id"].to_numpy()[va], yva, pred)
+    df = preds_frame(va_ids, yva, pred)
     df.to_parquet(run_dir / "preds_val.parquet", index=False)
     taus = {
         name: threshold.select_tau(pred.scores[name], cfg.eval.accept_rate)
