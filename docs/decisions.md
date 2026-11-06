@@ -62,3 +62,44 @@ per-score metrics under `scores`; the layout is documented in `uaar/eval/runner.
 passes the training subjects to methods whose `fit` accepts `groups`, and indexes windows by
 row position instead of assuming `window_id` equals the row. (6) No `uaar.mplstyle` file; the
 plot style is a dict in `uaar/eval/plots.py`.
+
+## 2026-11-05
+
+Decided by Robert; the options and counts are in `data-pipeline.md`.
+
+**Class eligibility: at least 25 subjects and 10 unique minutes** (`split.min_subjects: 25`,
+`split.min_minutes: 10`, counted in the single file). 38 classes are eligible; each split has
+28 known and 10 unknown. This is the tightest cut that keeps the demo exercises (Jumping Jacks
+has 25 subjects and 11.4 minutes) and it drops the 21-subject cohort, whose classes would have
+about four test subjects per fold. The plan's target of 10–16 known classes is replaced by 28:
+it cannot be reached with thresholds without losing the demo exercises, and hand-picking a
+smaller pool would be harder to defend.
+
+**Demo and recording exercise set (RecoFit label strings).**
+`Two-arm Dumbbell Curl (both arms, not alternating)`, `Shoulder Press (dumbbell)`,
+`Lateral Raise`, `Squat (arms in front of body, parallel to ground)`, `Jumping Jacks`. The
+specific curl and squat labels are used instead of the generic `Bicep Curl` and `Squat`: they
+have 44 and 43 subjects instead of 25, and they fix the arm position, which is what a wrist
+sensor measures. We perform them as named (both arms together; arms held out in front).
+Updated: `wearable-recording.md` (protocol labels).
+
+**Walk is non-exercise.** `Walk` (12,128 windows, the largest label by far) joins `Non-Exercise`
+and `Rest` in `split.nonexercise_labels`: never a class, part of the P1-b test set, taken from
+the multi file. Everyday motion is something the recognizer should reject, and the recording
+protocol already has walking in its rest block.
+
+**Near split and twin labels** (`configs/near_unknown_recofit.yaml`). The `near` split holds
+out ten look-alikes of known classes: Bicep Curl, Squat, Dumbbell Squat (hands at side), Squat
+Rack Shoulder Press, Sit-ups, Pushups, Side Plank Right side, Walking lunge, Static Stretch (at
+your own pace), Dumbbell Deadlift Row. All five demo exercises are known in it, so the `near`
+models are the ones used for the wearable tests (P4) and the live demo. In the random splits,
+five pairs of labels that name the same exercise in two cohorts (Bicep Curl / Two-arm Dumbbell
+Curl, Squat / Squat (arms in front ...), Sit-ups / Sit-up (hands positioned behind head),
+Pushups / Pushup (knee or foot variation), Static stretch / Static Stretch (at your own pace))
+are kept on the same side (`tied`), so a random split never holds out an exercise whose twin is
+known; the `near` split does that on purpose.
+
+**Open, noticed while checking the splits.** Subject folds ignore the cohorts, so a known class
+can have very few validation or test subjects (fold 3: one validation subject and two test
+subjects for its least-covered class; fold 0: two and five). Stratifying the folds by cohort
+would even this out. Not changed; to decide before the full sweep.

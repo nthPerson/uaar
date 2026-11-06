@@ -53,7 +53,7 @@ Minutes are `windows x hop / 60`, the quantity the eligibility rule uses.
 | Label | Minutes | Subjects | Windows |
 |---|---|---|---|
 | Non-Exercise *(non-exercise set)* | 1703.7 | 94 | 102219 |
-| Walk | 202.1 | 25 | 12128 |
+| Walk *(non-exercise set)* | 202.2 | 25 | 12134 |
 | Static stretch | 149.5 | 37 | 8970 |
 | Running (treadmill) | 119.1 | 21 | 7148 |
 | Elliptical machine | 108.5 | 22 | 6508 |
@@ -130,28 +130,44 @@ rack exercises). The 25-subject cohort's generic labels duplicate better-support
 variation)`), which matters for the class splits: a random split can hold out one twin while
 the other is known.
 
-### Eligibility decision (open, item 4.4)
+### Eligibility (decided 2026-11-05, item 4.4)
 
-The spec's defaults keep far more classes than the 10–16 known classes the plan targets. Eligible
-exercise classes (`Non-Exercise` and `Rest` excluded, single file only) for other thresholds:
+Eligible exercise classes (`Non-Exercise`, `Rest` and `Walk` excluded, single file only) by
+threshold:
 
 | min subjects | >= 5 min | >= 10 min | >= 20 min | >= 30 min |
 |---|---|---|---|---|
-| 20 | 52 | 52 | 38 | 25 |
-| 21 | 52 | 52 | 38 | 25 |
-| 25 | 39 | 39 | 32 | 22 |
+| 20 | 51 | 51 | 37 | 24 |
+| 21 | 51 | 51 | 37 | 24 |
+| 25 | 38 | 38 | 31 | 21 |
 | 29 | 27 | 27 | 26 | 19 |
 | 30 | 23 | 23 | 22 | 15 |
 | 40 | 11 | 11 | 10 | 7 |
-39 52 dropped at 25/10: ['Band Pull-Down Row', 'Biceps Curl (band)', 'Chest Press (rack)', 'Elliptical machine', 'Lawnmower (left arm)', 'Lawnmower (right arm)', 'Medicine Ball Slam', 'Rowing machine', 'Running (treadmill)', 'Squat (hands behind head)', 'Squat (kettlebell / goblet)', 'Triceps extension (lying down)', 'Wall Ball']
-total class windows single: 132787 nonex windows: 104171
+38 51 dropped at 25/10: ['Band Pull-Down Row', 'Biceps Curl (band)', 'Chest Press (rack)', 'Elliptical machine', 'Lawnmower (left arm)', 'Lawnmower (right arm)', 'Medicine Ball Slam', 'Rowing machine', 'Running (treadmill)', 'Squat (hands behind head)', 'Squat (kettlebell / goblet)', 'Triceps extension (lying down)', 'Wall Ball']
+total class windows single: 120659 nonex windows: 116305
 
-Constraints on the choice: the demo exercises must stay eligible (Jumping Jacks has 25 subjects
-and only 11.4 minutes; Bicep Curl and Squat 25 subjects; Lateral Raise 30; Shoulder Press
-(dumbbell) 43), and the `near` split needs look-alike pairs (curl variants, squat variants, row
-variants, sit-up variants). Re-run with, for example,
-`--steps splits --set split.min_subjects=25 split.min_minutes=10 --force` once decided and
-record the choice in `decisions.md`.
+**Chosen: 25 subjects, 10 minutes** (`configs/base.yaml`): 38 classes, of which each class split
+holds out 10 as unknown and keeps 28 known. With `Walk` in the non-exercise set the unique data are
+120,659 class windows (single file) and 116,305 non-exercise windows (multi file). Reasons and the alternatives are in `decisions.md`.
+
+### Splits (T1 input)
+
+`uv run scripts/prepare_data.py recofit --steps splits --force` writes 20 files: 5 subject folds
+x (`rand0`, `rand1`, `rand2`, `near`). The `near` pairs and the tied twin labels are in
+`configs/near_unknown_recofit.yaml`. Windows per part, fold 0:
+
+| Split | Known | Unknown | Train | Val | Test known | Test unknown | Test non-exercise |
+|---|---|---|---|---|---|---|---|
+| fold0_near | 28 | 10 | 43,128 | 7,971 | 12,004 | 4,168 | 19,804 |
+| fold0_rand0 | 28 | 10 | 44,811 | 7,996 | 12,483 | 3,689 | 19,804 |
+| fold0_rand1 | 28 | 10 | 37,270 | 6,456 | 10,686 | 5,486 | 19,804 |
+| fold0_rand2 | 28 | 10 | 43,648 | 8,375 | 12,640 | 3,532 | 19,804 |
+
+The non-exercise test set of fold 0 is 16,850 `Non-Exercise`, 2,441 `Walk` and 513 `Rest`
+windows from the multi file. Demo exercises in `fold0_near` (subjects / windows): train
+Two-arm Dumbbell Curl 32 / 1,458, Shoulder Press (dumbbell) 32 / 1,141, Lateral Raise 19 / 795,
+Squat (arms in front) 32 / 1,637, Jumping Jacks 18 / 504; validation 5, 4, 4, 4 and 2 subjects;
+test 7, 7, 7, 7 and 5 subjects.
 
 ## Our wearable
 

@@ -33,19 +33,22 @@ connect, enter subject and labels there, and download the three session files in
 
 ## Protocol (revised 2026-11-03, about 20 minutes per subject)
 
-Labels are the exact RecoFit activity names once the list is printed (`docs/data-pipeline.md`);
-until then use the working names below.
+The known sets are labelled with the exact RecoFit activity names (decided 2026-11-05,
+`decisions.md`), so a recorded set maps to a model class without a lookup table. Type the label
+exactly as written; the recorder repeats the previous label on Enter.
 
-| Block | Sets | Working label | Notes |
+| Block | Sets | Label | Notes |
 |---|---|---|---|
-| Known 1 | 3 × 30–40 s | `bicep_curl` | light dumbbell or a filled water bottle |
-| Known 2 | 3 × 30–40 s | `shoulder_press` | same weight |
-| Known 3 | 3 × 30–40 s | `lateral_raise` | same weight |
-| Known 4 | 3 × 30–40 s | `squat` | body weight, arms at sides |
-| Known 5 | 3 × 30–40 s | `jumping_jacks` | |
+| Known 1 | 3 × 30–40 s | `Two-arm Dumbbell Curl (both arms, not alternating)` | both arms together; light dumbbells or filled water bottles |
+| Known 2 | 3 × 30–40 s | `Shoulder Press (dumbbell)` | same weight |
+| Known 3 | 3 × 30–40 s | `Lateral Raise` | same weight |
+| Known 4 | 3 × 30–40 s | `Squat (arms in front of body, parallel to ground)` | body weight, arms held straight out in front |
+| Known 5 | 3 × 30–40 s | `Jumping Jacks` | |
 | Unknown | 2 × 30 s each | `arm_circles`, `shadow_boxing`, `waving` | movements not in RecoFit |
-| Placement shift | 1 × 30 s each | `bicep_curl_rotated90`, `bicep_curl_loose` | case rotated 90° on the wrist; loose strap |
-| Rest | 1 × 60 s each | `standing_still`, `walking` | |
+| Placement shift | 1 × 30 s each | `curl_rotated90`, `curl_loose` | the Known 1 exercise with the case rotated 90° on the wrist; with a loose strap |
+| Rest | 1 × 60 s each | `standing_still`, `walking` | non-exercise: the models should call these unknown |
+
+Labels in lower case with underscores are ours and are not model classes.
 
 Rest 20–30 s between sets; the recorder keeps streaming, only button-delimited sets are labelled.
 

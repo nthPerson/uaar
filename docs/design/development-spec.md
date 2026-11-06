@@ -388,9 +388,9 @@ Revised 2026-11-03. The original W0–W3 plan (Oct 8 – Nov 1) did not run: the
 | 4.1 | Repository bootstrap (§2.3); firmware v0.1.0 flashed and verified; `wearable.py` + tests; `record_wearable.py`; 60-s test recording | R | **done Nov 3** |
 | 4.1b | `windows.py`, `splits.py`, `registry.py`, `Config`, `train_loop.py`, `backbone.py`, `softmax.py`, `edl.py`, `normalize.py`, `threshold.py`, `prepare_data.py`, `train.py` written and tested on synthetic data (ahead of 4.4, 5.2, 5.3); `uaar.live` backend, `live_replay.py` and the `web/` page (4.6) working with a placeholder predictor | R | **done Nov 3**, pending the real-data run |
 | 4.2 | GitHub remote `uaar` (public), CI green, Sirena's clone passes `pytest` | R, S | first CI-green commit |
-| 4.3 | `recofit.py` single- and multi-activity loaders → `recordings.parquet`; the 75 labels printed to `docs/data-pipeline.md` | R | label list committed |
-| 4.4 | `windows.py`, `splits.py` + leakage tests; eligibility thresholds decided; `rand0–2` and `near` splits; T1 | R (near pairs B) | `splits/*.json`, T1 generated |
-| 4.5 | `metrics.py`, `calibration.py`, `threshold.py` + tests (§7); read Gal & Ghahramani 2016 | S | tests pass |
+| 4.3 | `recofit.py` single- and multi-activity loaders → `recordings.parquet`; the 75 labels printed to `docs/data-pipeline.md` | R | **done Nov 3** |
+| 4.4 | `windows.py`, `splits.py` + leakage tests; eligibility thresholds decided; `rand0–2` and `near` splits; T1 | R (near pairs B) | **done Nov 5**: 25 subjects / 10 min, 38 classes, 20 split files (`../decisions.md`); near pairs to confirm with Sirena |
+| 4.5 | `metrics.py`, `calibration.py`, `threshold.py` + tests (§7); read Gal & Ghahramani 2016 | S | written Nov 4 with AI assistance, tests pass; **Sirena to review** |
 | 4.6 | Browser page `web/`: Web Bluetooth connect, live charts, session state from the button, record mode that saves the session CSV | R | written and simulator-tested Nov 3; **to verify against a kit in Windows Chrome** |
 | 4.7 | Sirena's kit assembled and flashed; both kits gyro-calibrated; exercise set confirmed against the label list (§12) | B | `docs/wearable-recording.md` device table |
 
@@ -400,10 +400,10 @@ Revised 2026-11-03. The original W0–W3 plan (Oct 8 – Nov 1) did not run: the
 
 | # | Item | Owner | Done when |
 |---|---|---|---|
-| 5.1 | `handcrafted.py`, `logreg.py`, `evaluate.py` with P1 known/unknown sets, `metrics.json` | S writes, R reviews | M1 row of T2, fold 0 |
+| 5.1 | `handcrafted.py`, `logreg.py`, `evaluate.py` with P1 known/unknown sets, `metrics.json` | S writes, R reviews | written Nov 4 with AI assistance (also `sweep.py`, `make_tables.py`); **Sirena and Robert to review** |
 | 5.2 | `backbone.py`, `softmax.py`, `train_loop.py`, `normalize.py`, `Config`, `train.py`, run-directory writer | R writes, S reviews | M2 row of T2, fold 0 |
 | 5.3 | `edl.py` + `test_edl.py`; fold-0 run; vacuity histograms | R | val macro-F1 within 2 points of M2 |
-| 5.4 | `mcdropout.py` + `test_mcdropout.py`; fold-0 evaluation at T = 30 | S | score histograms |
+| 5.4 | `mcdropout.py` + `test_mcdropout.py`; fold-0 evaluation at T = 30 | S | written Nov 4 with AI assistance; **Sirena to review** |
 | 5.5 | **Recording session 1**: both subjects, ~20 min each, protocol in [software-and-firmware.md §5](software-and-firmware.md#5-recording-protocol-stretch-goal-3) as revised in `decisions.md` | B | labelled sessions in `data/wearable/`, zero-gap check |
 | 5.6 | Live backend: FastAPI WebSocket in WSL, 2-s windowing at 1-s hop, inference for all four methods from exported run directories, side-by-side panel | R | demo runs with fold-0 models on one kit |
 | 5.7 | `docs/methods.md` for M1–M4 in own words (§8.2); `docs/architecture.md` | R (M3), S (M4), B | reviewed |
@@ -449,7 +449,7 @@ Beyond [README.md §8](README.md#8-risks):
 | `loadmat` on the 1.5 GB files needs ~3 GB RAM and 14 s per file; the multi-activity file's nested structs are awkward | Process per subject, append to Parquet; write the loader against a tiny synthetic `.mat` first; keep the raw `.mat` only in `data/external/` |
 | GPU not available under WSL2 when the eGPU is detached | `train.py` falls back to CPU with a warning; the smoke sweep is sized to run on CPU in an hour |
 | Sirena's machine cannot run the full sweep | Split by method, not by fold: Robert runs M2/M3 training; Sirena runs M1 and all evaluation-only work (M4, P1-b, P2, tables) |
-| Class-eligibility thresholds leave too few known classes | Decide thresholds from the W1 counts with a target of 10–16 known classes; record in `decisions.md` |
+| Class-eligibility thresholds leave too few known classes | Decided Nov 5: 28 known classes per split (the 10–16 target was dropped, see `decisions.md`) |
 | Streamlit app slow on upload (MC Dropout T = 30 per window) | Cache models; batch all windows in one forward pass per stochastic sample; cap uploads at 10 minutes of signal |
 | Two people editing `docs/design/*.md` and the proposal-era copies in this repository drift apart | After bootstrap, this folder is frozen with a note pointing to the `uaar` repository |
 | Wearable firmware differs from the FormCoach design docs (units, columns) | Item 5.6 confirms before the session; the parser is table-driven by firmware version in `meta.json` |
@@ -462,14 +462,14 @@ To be settled at the dates shown and logged in `decisions.md`.
 | Decision | By | Owner |
 |---|---|---|
 | Role split confirmed with Sirena (this plan assumes [README.md §6](README.md#6-roles)) | Nov 6 | B |
-| Known-class eligibility thresholds and the resulting known/unknown lists | Nov 7 (item 4.4) | R |
-| Hand-picked `near` split pairs | Nov 7 | B |
+| ~~Known-class eligibility thresholds and the resulting known/unknown lists~~ settled Nov 5 | Nov 7 (item 4.4) | R |
+| ~~Hand-picked `near` split pairs~~ settled Nov 5 by Robert; Sirena to confirm | Nov 7 | B |
 | Class weighting vs balanced sampling (choose on fold 0, freeze) | Nov 13 (item 5.2) | B |
 | MM-Fit → RecoFit label mapping | Nov 17 (item 6.3) | R |
 | Report format (LaTeX vs Word) and who holds the master file | Nov 15 | B |
 | Which model the app demonstrates by default (the instructor requires one; we show four with one default) | Nov 18 | S |
 | Seeds per cell (3 planned; 2 if the sweep exceeds one night) | Nov 16 | R |
-| Exercise set for our recordings: shortlist bicep curl, dumbbell shoulder press, lateral raise, squat, jumping jacks (in RecoFit and MM-Fit, wrist-visible, classroom-safe) plus 2–3 unknown movements; confirm names against the printed label list | Nov 7 (item 4.7) | B |
+| ~~Exercise set for our recordings~~ settled Nov 5: Two-arm Dumbbell Curl, Shoulder Press (dumbbell), Lateral Raise, Squat (arms in front), Jumping Jacks, plus 2–3 unknown movements (`../decisions.md`) | Nov 7 (item 4.7) | B |
 | Fine-tuning recipe (what is frozen, epochs, how τ is re-selected) | Nov 16 (item 6.2) | R |
 
 Settled decisions are logged with their reasons in [`../decisions.md`](../decisions.md).
