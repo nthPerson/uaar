@@ -1,5 +1,8 @@
 """EDL invariants (spec §7 test_edl)."""
 
+import math
+
+import pytest
 import torch
 import torch.nn.functional as F
 
@@ -43,11 +46,28 @@ def test_mse_and_digamma_variants_agree_in_ordering():
     alpha = torch.tensor([[50.0, 1.0, 1.0], [2.0, 2.0, 2.0], [1.0, 50.0, 1.0]], dtype=torch.float64)
     a = edl.edl_loss(alpha, y, lam=1.0, reduction="none")
     b = edl.edl_loss_digamma(alpha, y, lam=1.0, reduction="none")
-    assert torch.equal(torch.argsort(a), torch.argsort(b)) and torch.argsort(a).tolist() == [
-        0,
-        1,
-        2,
-    ]
+    c = edl.edl_loss_log(alpha, y, lam=1.0, reduction="none")
+    assert torch.argsort(a).tolist() == [0, 1, 2]
+    assert torch.equal(torch.argsort(a), torch.argsort(b))
+    assert torch.equal(torch.argsort(a), torch.argsort(c))
+
+
+def test_log_loss_hand_case_and_zero_kl_weight():
+    y = F.one_hot(torch.tensor([1]), 3).double()
+    alpha = torch.tensor([[1.0, 6.0, 3.0]], dtype=torch.float64)
+    got = edl.edl_loss_log(alpha, y, lam=0.0)
+    assert got.item() == pytest.approx(math.log(10.0) - math.log(6.0))
+
+
+def test_method_options_are_checked_saved_and_loaded(tmp_path):
+    with pytest.raises(ValueError, match="unknown EDL loss"):
+        edl.EDLMethod(3, ["a", "b", "c"], loss="nope")
+    m = edl.EDLMethod(3, ["a", "b", "c"], loss="log", kl_weight=0.1, kl_anneal_epochs=5)
+    m.stats = {"mean": [0.0] * 6, "std": [1.0] * 6}
+    m.save(tmp_path)
+    back = edl.EDLMethod.load(tmp_path)
+    assert (back.loss_kind, back.kl_weight, back.kl_anneal_epochs) == ("log", 0.1, 5)
+    assert edl.EDLMethod(3, ["a", "b", "c"]).loss_kind == "digamma"
 
 
 def test_vacuity_range_and_monotone_in_evidence():

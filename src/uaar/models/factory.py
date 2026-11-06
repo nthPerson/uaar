@@ -31,8 +31,9 @@ def build(cfg: Config, classes: list[str], seed: int = 0):
             classes,
             dropout=cfg.model.dropout,
             evidence=e.get("evidence", "softplus"),
-            loss=e.get("loss", "mse"),
+            loss=e.get("loss", "digamma"),
             kl_anneal_epochs=int(e.get("kl_anneal_epochs", 10)),
+            kl_weight=float(e.get("kl_weight", 1.0)),
             seed=seed,
         )
     if method == "logreg":

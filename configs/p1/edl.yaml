@@ -1,2 +1,2 @@
 method: edl
-model: {edl: {evidence: softplus, loss: mse, kl_anneal_epochs: 10}}
+model: {edl: {evidence: softplus, loss: digamma, kl_anneal_epochs: 10}}

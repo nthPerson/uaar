@@ -7,8 +7,12 @@ single-pass uncertainty is the vacuity u = K / S. Implemented from the paper by 
 assistance recorded in docs/ai-use-log.md.
 
 Equations referenced below use the paper's numbering: Eq. 3 (negative log marginal
-likelihood), Eq. 4 (expected cross-entropy, the digamma form), Eq. 5 (expected squared error,
-the default), Eq. 7 (KL to the uniform Dirichlet in closed form), Eq. 8 (annealed total loss).
+likelihood), Eq. 4 (expected cross-entropy, the digamma form), Eq. 5 (expected squared error),
+Eq. 7 (KL to the uniform Dirichlet in closed form), Eq. 8 (annealed total loss).
+
+The default loss here is Eq. 4. The paper prefers Eq. 5, but on the 28-class RecoFit problem
+the squared-error loss leaves more than half of the windows with zero evidence for every class
+and the network does not train (docs/decisions.md, 2026-11-05).
 """
 
 from __future__ import annotations
@@ -95,11 +99,28 @@ def edl_loss_digamma(
     class_weights: torch.Tensor | None = None,
     reduction: str = "mean",
 ) -> torch.Tensor:
-    """Ablation: Eq. 4 (expected cross-entropy, sum_k y_k (psi(S) - psi(alpha_k))) + lam * Eq. 7."""
+    """Eq. 4 (expected cross-entropy, sum_k y_k (psi(S) - psi(alpha_k))) + lam * Eq. 7."""
     S = alpha.sum(dim=1, keepdim=True)
     ce = (y_onehot * (torch.digamma(S) - torch.digamma(alpha))).sum(dim=1)
     kl = kl_dirichlet_uniform(_misleading_alpha(alpha, y_onehot))
     return _reduce(ce + lam * kl, y_onehot, class_weights, reduction)
+
+
+def edl_loss_log(
+    alpha: torch.Tensor,
+    y_onehot: torch.Tensor,
+    lam: float,
+    class_weights: torch.Tensor | None = None,
+    reduction: str = "mean",
+) -> torch.Tensor:
+    """Eq. 3 (negative log marginal likelihood, sum_k y_k (log S - log alpha_k)) + lam * Eq. 7."""
+    S = alpha.sum(dim=1, keepdim=True)
+    nll = (y_onehot * (torch.log(S) - torch.log(alpha))).sum(dim=1)
+    kl = kl_dirichlet_uniform(_misleading_alpha(alpha, y_onehot))
+    return _reduce(nll + lam * kl, y_onehot, class_weights, reduction)
+
+
+LOSSES = {"mse": edl_loss, "digamma": edl_loss_digamma, "log": edl_loss_log}
 
 
 def _reduce(per_sample, y_onehot, class_weights, reduction):
@@ -142,6 +163,7 @@ __all__ = [
     "EDLNet",
     "edl_loss",
     "edl_loss_digamma",
+    "edl_loss_log",
     "kl_dirichlet_uniform",
     "dirichlet_summary",
     "evidence_from_logits",
@@ -150,7 +172,14 @@ __all__ = [
 
 
 class EDLMethod:
-    """The Method interface for EDL (fit / predict / save / load), mirroring SoftmaxMethod."""
+    """The Method interface for EDL (fit / predict / save / load), mirroring SoftmaxMethod.
+
+    Args:
+        loss: ``"digamma"`` (Eq. 4, default), ``"mse"`` (Eq. 5) or ``"log"`` (Eq. 3).
+        kl_anneal_epochs: epochs over which the KL weight ramps linearly from 0.
+        kl_weight: the value the KL weight ramps to, lambda_t = kl_weight * min(1, epoch /
+            kl_anneal_epochs). 1.0 is the paper's schedule; smaller values regularize less.
+    """
 
     name = "edl"
     score_names = ["vacuity", "one_minus_max"]
@@ -161,14 +190,18 @@ class EDLMethod:
         classes: list[str],
         dropout: float = 0.3,
         evidence: Evidence = "softplus",
-        loss: str = "mse",
+        loss: str = "digamma",
         kl_anneal_epochs: int = 10,
+        kl_weight: float = 1.0,
         seed: int = 0,
     ):
+        if loss not in LOSSES:
+            raise ValueError(f"unknown EDL loss {loss!r}; choose from {sorted(LOSSES)}")
         self.classes = classes
         self.seed = seed
         self.loss_kind = loss
         self.kl_anneal_epochs = kl_anneal_epochs
+        self.kl_weight = float(kl_weight)
         self.model = EDLNet(n_classes, dropout=dropout, evidence=evidence)
         self.stats: dict | None = None
         self.history = None
@@ -185,13 +218,14 @@ class EDLMethod:
         device = device_for()
         K = len(self.classes)
         w = torch.from_numpy(class_weights(ytr, K, cfg.train.class_weighting)).to(device)
-        loss_core = edl_loss if self.loss_kind == "mse" else edl_loss_digamma
+        loss_core = LOSSES[self.loss_kind]
+
+        def lam(epoch):
+            return self.kl_weight * kl_anneal(epoch, self.kl_anneal_epochs)
 
         def loss_fn(alpha, y, epoch):
             y1 = F.one_hot(y, K).to(alpha.dtype)
-            return loss_core(
-                alpha, y1, lam=kl_anneal(epoch, self.kl_anneal_epochs), class_weights=w
-            )
+            return loss_core(alpha, y1, lam=lam(epoch), class_weights=w)
 
         self.history = fit(
             self.model,
@@ -208,7 +242,7 @@ class EDLMethod:
             patience=cfg.train.patience,
             num_workers=cfg.train.num_workers,
             device=device,
-            extra_columns=lambda e: {"lambda_t": kl_anneal(e, self.kl_anneal_epochs)},
+            extra_columns=lambda e: {"lambda_t": lam(e)},
         )
         self.history.write(run_dir / "history.csv")
 
@@ -244,6 +278,7 @@ class EDLMethod:
             "method": self.name,
             "loss": self.loss_kind,
             "kl_anneal_epochs": self.kl_anneal_epochs,
+            "kl_weight": self.kl_weight,
         }
         (run_dir / "config.json").write_text(json.dumps(conf, indent=2))
         normalize.save(
@@ -268,6 +303,7 @@ class EDLMethod:
             evidence=conf["evidence"],
             loss=conf.get("loss", "mse"),
             kl_anneal_epochs=conf.get("kl_anneal_epochs", 10),
+            kl_weight=conf.get("kl_weight", 1.0),
             seed=conf.get("seed", 0),
         )
         m.model.load_state_dict(torch.load(run_dir / "model.pt", map_location="cpu"))
