@@ -76,9 +76,10 @@ def step_splits(dataset: str, p: dict, cfg: Config, force: bool, near_file: Path
         print(f"skip splits ({p['splits_dir']} has files)")
         return
     _, meta = registry.load_windows(dataset)
-    near_pairs = None
+    near_pairs, tied = None, []
     if near_file is not None and near_file.exists():
-        near_pairs = yaml.safe_load(near_file.read_text()).get("pairs")
+        near = yaml.safe_load(near_file.read_text())
+        near_pairs, tied = near.get("pairs"), near.get("tied") or []
     with timer("splits"):
         written = splits.write_splits(
             meta,
@@ -93,12 +94,19 @@ def step_splits(dataset: str, p: dict, cfg: Config, force: bool, near_file: Path
             hop_s=cfg.data.hop_s,
             exclude=cfg.get("split.nonexercise_labels", []) or [],
             class_source=cfg.get("split.class_source"),
+            tied=tied,
         )
     first = json.loads(written[0].read_text())
     n_eligible = len(first["known_classes"]) + len(first["unknown_classes"])
     print(f"{len(written)} split files; eligible classes: {n_eligible}")
-    print("known  :", first["known_classes"])
-    print("unknown:", first["unknown_classes"])
+    seen = set()
+    for path in written:
+        d = json.loads(path.read_text())
+        if d["class_split"] not in seen:
+            seen.add(d["class_split"])
+            print(f"{d['class_split']}: {len(d['known_classes'])} known; unknown:")
+            for c in d["unknown_classes"]:
+                print(f"    {c}")
 
 
 def step_features(dataset: str, p: dict, force: bool) -> None:

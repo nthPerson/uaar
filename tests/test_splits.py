@@ -303,3 +303,32 @@ def test_label_table_counts_one_source(meta):
     doubled = sp.label_table(both, nonexercise=NONEX).set_index("label")
     assert doubled.loc["Curl", "windows"] == 2 * 25 * 40
     assert list(t["minutes"]) == sorted(t["minutes"], reverse=True)
+
+
+def test_tied_classes_stay_on_the_same_side(eligible):
+    tied = [["Curl", "Row"], ["Squat", "Lunge", "NotEligible"]]
+    sides = set()
+    for seed in range(40):
+        known, unknown = sp.make_class_split(eligible, frac_unknown=0.34, seed=seed, tied=tied)
+        assert sorted(known + unknown) == eligible and not set(known) & set(unknown)
+        assert len(unknown) == 2  # round(0.34 * 6): exact, with pairs or singletons
+        for a, b in (("Curl", "Row"), ("Squat", "Lunge")):
+            assert (a in unknown) == (b in unknown)
+        sides.add(tuple(unknown))
+        assert (known, unknown) == sp.make_class_split(eligible, 0.34, seed, tied=tied)
+    assert len(sides) > 1  # a group is sometimes held out, sometimes a pair of singletons
+    assert any("Curl" in u for u in sides) and any("Curl" not in u for u in sides)
+    # no ties: unchanged behaviour
+    assert sp.make_class_split(eligible, 0.34, 3, tied=[]) == sp.make_class_split(eligible, 0.34, 3)
+    with pytest.raises(ValueError, match="more than one"):
+        sp.make_class_split(eligible, 0.34, 0, tied=[["Curl", "Row"], ["Row", "Squat"]])
+
+
+def test_write_splits_honours_tied(meta, tmp_path):
+    paths = sp.write_splits(
+        meta, tmp_path / "recofit" / "splits", n_folds=5, class_split_seeds=range(8),
+        min_subjects=20, min_minutes=5.0, tied=[["Curl", "Squat"]],
+    )  # fmt: skip
+    for path in paths:
+        u = sp.load_split(path).unknown_classes
+        assert ("Curl" in u) == ("Squat" in u)

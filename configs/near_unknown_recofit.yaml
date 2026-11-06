@@ -1,0 +1,28 @@
+# RecoFit class-split hand choices (decided 2026-11-05, docs/decisions.md).
+#
+# pairs: the `near` split. Each key is held out as unknown; its value is the known class it
+# resembles. All five demo exercises (Two-arm Dumbbell Curl, Shoulder Press (dumbbell), Lateral
+# Raise, Squat (arms in front ...), Jumping Jacks) are known in this split, so its models are
+# the ones used for the wearable tests and the live demo.
+pairs:
+  "Bicep Curl": "Two-arm Dumbbell Curl (both arms, not alternating)"
+  "Squat": "Squat (arms in front of body, parallel to ground)"
+  "Dumbbell Squat (hands at side)": "Squat (arms in front of body, parallel to ground)"
+  "Squat Rack Shoulder Press": "Shoulder Press (dumbbell)"
+  "Sit-ups": "Sit-up (hands positioned behind head)"
+  "Pushups": "Pushup (knee or foot variation)"
+  "Side Plank Right side": "Side Plank Left side"
+  "Walking lunge": "Lunge (alternating both legs, weight optional)"
+  "Static Stretch (at your own pace)": "Static stretch"
+  "Dumbbell Deadlift Row": "Dumbbell Row (knee on bench) (label spans both arms)"
+
+# tied: two labels for the same exercise (RecoFit's 25-subject cohort uses generic names for
+# exercises that another cohort has under a specific name). In the random splits (rand0-2) both
+# labels of a group land on the same side, so those splits never hold out an exercise whose
+# twin is known. The near split above does exactly that on purpose.
+tied:
+  - ["Bicep Curl", "Two-arm Dumbbell Curl (both arms, not alternating)"]
+  - ["Squat", "Squat (arms in front of body, parallel to ground)"]
+  - ["Sit-ups", "Sit-up (hands positioned behind head)"]
+  - ["Pushups", "Pushup (knee or foot variation)"]
+  - ["Static stretch", "Static Stretch (at your own pace)"]

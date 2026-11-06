@@ -157,7 +157,10 @@ def label_table(
 
 
 def make_class_split(
-    classes: Sequence[str], frac_unknown: float = 0.25, seed: int = 0
+    classes: Sequence[str],
+    frac_unknown: float = 0.25,
+    seed: int = 0,
+    tied: Iterable[Sequence[str]] = (),
 ) -> tuple[list[str], list[str]]:
     """Randomly hold out about ``frac_unknown`` of ``classes`` as unknown.
 
@@ -165,18 +168,37 @@ def make_class_split(
         classes: Eligible class names (any order; duplicates ignored).
         frac_unknown: Fraction held out; the count is ``round(frac_unknown * n)``, at least 1.
         seed: Seed for ``numpy.random.default_rng``.
+        tied: Groups of classes that must land on the same side (two labels for the same
+            exercise: holding one out while the other is known would make the "unknown"
+            windows a known exercise). Members that are not in ``classes`` are ignored. A
+            class may be in at most one group.
 
     Returns:
-        ``(known, unknown)``, both sorted, disjoint, covering ``classes``.
+        ``(known, unknown)``, both sorted, disjoint, covering ``classes``. With ``tied`` groups
+        the classes are drawn group by group in a seeded random order, skipping a group that
+        would exceed the count, so the unknown count is exact unless only groups are left.
     """
     classes = sorted(set(classes))
     if len(classes) < 2:
         raise ValueError("need at least two classes to form a known/unknown split")
     n_unknown = min(len(classes) - 1, max(1, int(round(frac_unknown * len(classes)))))
     rng = np.random.default_rng(seed)
-    unknown = sorted(rng.choice(classes, size=n_unknown, replace=False).tolist())
-    known = sorted(set(classes) - set(unknown))
-    return known, unknown
+    groups = [sorted(set(g) & set(classes)) for g in tied]
+    groups = [g for g in groups if len(g) > 1]
+    if not groups:
+        unknown = sorted(rng.choice(classes, size=n_unknown, replace=False).tolist())
+        return sorted(set(classes) - set(unknown)), unknown
+
+    in_group = [c for g in groups for c in g]
+    if len(in_group) != len(set(in_group)):
+        raise ValueError("a class appears in more than one tied group")
+    units = sorted(groups + [[c] for c in classes if c not in set(in_group)])
+    unknown: list[str] = []
+    for i in rng.permutation(len(units)):
+        if len(unknown) + len(units[i]) <= n_unknown:
+            unknown += units[i]
+    unknown = sorted(unknown)
+    return sorted(set(classes) - set(unknown)), unknown
 
 
 def near_unknown_split(
@@ -267,6 +289,7 @@ def write_splits(
     hop_s: float = 1.0,
     exclude: Iterable[str] = (),
     class_source: str | None = None,
+    tied: Iterable[Sequence[str]] = (),
 ) -> list[Path]:
     """Write every ``fold{k}_{classsplit}.json`` for a dataset (spec §3.3).
 
@@ -285,6 +308,8 @@ def write_splits(
         exclude: Labels that are never classes (the non-exercise labels).
         class_source: ``source`` value that class windows are taken from (see the module
             docstring); stored in every split file and honoured by :func:`select`.
+        tied: Groups of classes kept on the same side in the random splits
+            (see :func:`make_class_split`); the ``near`` split is hand-written and ignores it.
 
     Returns:
         Paths of the written files, in ``(fold, class split)`` order.
@@ -300,7 +325,9 @@ def write_splits(
 
     class_splits: list[tuple[str, int | None, list[str], list[str]]] = []
     for s in class_split_seeds:
-        known, unknown = make_class_split(classes, frac_unknown=frac_unknown, seed=int(s))
+        known, unknown = make_class_split(
+            classes, frac_unknown=frac_unknown, seed=int(s), tied=tied
+        )
         class_splits.append((f"rand{int(s)}", int(s), known, unknown))
     if near_pairs is not None:
         known, unknown = near_unknown_split(classes, near_pairs)
