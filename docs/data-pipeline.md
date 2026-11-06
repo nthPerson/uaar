@@ -154,20 +154,105 @@ holds out 10 as unknown and keeps 28 known. With `Walk` in the non-exercise set 
 
 `uv run scripts/prepare_data.py recofit --steps splits --force` writes 20 files: 5 subject folds
 x (`rand0`, `rand1`, `rand2`, `near`). The `near` pairs and the tied twin labels are in
-`configs/near_unknown_recofit.yaml`. Windows per part, fold 0:
+`configs/near_unknown_recofit.yaml`; the folds are class-stratified (next section). Windows per
+part, fold 0:
 
 | Split | Known | Unknown | Train | Val | Test known | Test unknown | Test non-exercise |
 |---|---|---|---|---|---|---|---|
-| fold0_near | 28 | 10 | 43,128 | 7,971 | 12,004 | 4,168 | 19,804 |
-| fold0_rand0 | 28 | 10 | 44,811 | 7,996 | 12,483 | 3,689 | 19,804 |
-| fold0_rand1 | 28 | 10 | 37,270 | 6,456 | 10,686 | 5,486 | 19,804 |
-| fold0_rand2 | 28 | 10 | 43,648 | 8,375 | 12,640 | 3,532 | 19,804 |
+| fold0_near | 28 | 10 | 43,371 | 7,254 | 12,478 | 3,750 | 26,341 |
+| fold0_rand0 | 28 | 10 | 44,847 | 7,880 | 12,563 | 3,665 | 26,341 |
+| fold0_rand1 | 28 | 10 | 37,011 | 6,470 | 10,931 | 5,297 | 26,341 |
+| fold0_rand2 | 28 | 10 | 44,560 | 7,652 | 12,451 | 3,777 | 26,341 |
 
-The non-exercise test set of fold 0 is 16,850 `Non-Exercise`, 2,441 `Walk` and 513 `Rest`
-windows from the multi file. Demo exercises in `fold0_near` (subjects / windows): train
-Two-arm Dumbbell Curl 32 / 1,458, Shoulder Press (dumbbell) 32 / 1,141, Lateral Raise 19 / 795,
-Squat (arms in front) 32 / 1,637, Jumping Jacks 18 / 504; validation 5, 4, 4, 4 and 2 subjects;
-test 7, 7, 7, 7 and 5 subjects.
+Fold 0 has 63 training, 12 validation and 19 test subjects. Its non-exercise test set is 23,849
+`Non-Exercise`, 2,375 `Walk` and 117 `Rest` windows from the multi file. Demo exercises in
+`fold0_near` (subjects / windows): train Two-arm Dumbbell Curl 30 / 1,391, Shoulder Press
+(dumbbell) 29 / 1,042, Lateral Raise 20 / 976, Squat (arms in front) 29 / 1,540, Jumping Jacks
+17 / 469; validation 5, 5, 4, 5 and 3 subjects; test 9, 9, 6, 9 and 5 subjects.
+
+### Subject folds are stratified by exercise (decided 2026-11-05)
+
+This section is written to be reused in the report (data description and experimental setup)
+and in the presentation.
+
+**The problem.** RecoFit was collected in four groups of participants, and each group did its
+own list of exercises (the cohort note above). An exercise therefore has data from only 25 to
+61 of the 94 subjects (median 30). The usual way to make subject-independent folds, shuffling
+the subjects and cutting the list into five, ignores this, so by chance one fold can receive
+most of a cohort's subjects as training subjects and almost none as validation or test
+subjects. With the unstratified folds of the first run (seed 0), counting subjects per
+eligible class:
+
+| Fold | Val subjects per class: min / median | Classes with < 3 val subjects (of 38) | Test subjects per class: min / median | Classes with < 3 test subjects |
+|---|---|---|---|---|
+| 0 | 2 / 4 | 13 | 5 / 7 | 0 |
+| 1 | 2 / 4 | 3 | 3 / 6 | 0 |
+| 2 | 2 / 3 | 2 | 6 / 7 | 0 |
+| 3 | **1** / 2 | **24** | **2** / 7 | **11** |
+| 4 | 3 / 5 | 0 | 4 / 6 | 0 |
+
+In fold 3, 24 of the 38 classes had one or two validation subjects (Lateral Raise had one,
+Jumping Jacks two) and 11 classes had two test subjects.
+
+**Why it matters for this project in particular.**
+
+1. *The rejection threshold comes from the validation subjects.* τ is the 95th percentile of
+   the validation known-class scores, and it is never re-tuned. If a class is represented by
+   one validation subject, τ for every method depends on how that one person moves.
+2. *Model selection uses validation macro-F1*, which weights every class equally. A class with
+   one validation subject contributes as much to early stopping as a class with eight.
+3. *The headline metrics are macro-averaged and their confidence intervals resample test
+   subjects.* A class with two test subjects has an unstable per-class F1 and can disappear
+   from a bootstrap resample altogether.
+4. *Method comparisons are paired by fold.* If folds differ mainly in which classes are
+   under-represented, fold-to-fold variation reflects fold composition and not the methods,
+   which weakens the Wilcoxon tests.
+
+**What we do instead.** Subjects are assigned to folds by *iterative stratification*
+(Sechidis, Tsoumakas & Vlahavas 2011, a standard method for multi-label data), treating each
+subject as an example and "this subject performed exercise c" as its labels. The exercise
+with the fewest unassigned subjects is dealt out first; each of its subjects goes to the fold
+that still lacks the most subjects of that exercise (ties: the fold lacking the most subjects
+overall, then at random with the seed). The same procedure then separates the validation
+subjects (15 %) from the training subjects inside each fold. Code:
+`uaar.data.splits.stratified_assign` and `make_subject_folds(stratify_classes=...)`, switched
+on by `split.stratify_folds: true`, recorded in every split file as
+`"fold_strategy": "class_stratified"`, tested in `tests/test_splits.py`.
+
+**Result** (same seed, same data):
+
+| Fold | Train / val / test subjects | Val subjects per class: min / median / max | Test subjects per class: min / median / max | Classes with < 3 val or test subjects |
+|---|---|---|---|---|
+| 0 | 63 / 12 / 19 | 3 / 4 / 8 | 5 / 6 / 11 | 0 |
+| 1 | 64 / 11 / 19 | 3 / 4 / 7 | 5 / 6 / 12 | 0 |
+| 2 | 64 / 11 / 19 | 3 / 4 / 7 | 5 / 6 / 13 | 0 |
+| 3 | 64 / 11 / 19 | 3 / 4 / 8 | 5 / 6 / 12 | 0 |
+| 4 | 65 / 11 / 18 | 3 / 4 / 7 | 5 / 6 / 13 | 0 |
+
+Every class now has at least 3 validation subjects, at least 5 test subjects and at least 17
+training subjects in every fold, and the five folds look alike. In all 20 split files every
+known class has at least 3 validation and 5 test subjects.
+
+**What did not change, and why this is still a fair test.**
+
+- A subject is still in exactly one of train, validation and test; every subject is a test
+  subject in exactly one fold. The evaluation is as subject-independent as before.
+- The fold sizes are the same (18 or 19 test subjects, 11 or 12 validation subjects).
+- The only information used is *which exercises each subject performed*, which is a fact about
+  how the dataset was collected. No signal, no model output and no result was used.
+- The known/unknown class splits are unchanged; they do not depend on the folds.
+- It was decided from the subject counts above, before any full results were compared. The
+  fold-0 runs made on the unstratified folds (two class splits) are kept aside in
+  `reports/runs/unstratified-fold0/` and are not used in any table.
+
+**Limitation to state.** Three validation subjects per class is still few, because the data
+have only 25 subjects for the smallest classes. Stratification makes the folds even; it cannot
+add subjects. This is one reason results are reported as a mean and spread over five folds.
+
+**Short form for a slide.** "RecoFit's participants did different exercise lists, so random
+subject folds left some exercises with 1–2 validation subjects (24 of 38 classes in one fold).
+We stratify the subject folds by exercise: every class now has ≥ 3 validation and ≥ 5 test
+subjects in every fold. Subjects never cross between train and test."
 
 ## Our wearable
 

@@ -99,7 +99,22 @@ Pushups / Pushup (knee or foot variation), Static stretch / Static Stretch (at y
 are kept on the same side (`tied`), so a random split never holds out an exercise whose twin is
 known; the `near` split does that on purpose.
 
-**Open, noticed while checking the splits.** Subject folds ignore the cohorts, so a known class
-can have very few validation or test subjects (fold 3: one validation subject and two test
-subjects for its least-covered class; fold 0: two and five). Stratifying the folds by cohort
-would even this out. Not changed; to decide before the full sweep.
+**Subject folds are stratified by exercise** (`split.stratify_folds: true`; decided by Robert
+the same day, after the counts below were shown). *Problem:* RecoFit is four participant
+cohorts with their own exercise lists, so an exercise has data from only 25 to 61 of the 94
+subjects, and folds made by shuffling subjects left some classes almost without validation or
+test subjects: in fold 3, 24 of the 38 eligible classes had one or two validation subjects and
+11 had two test subjects. *Why it matters here:* the rejection threshold τ and early stopping
+come from the validation subjects, the headline metrics are macro-averaged over classes with
+confidence intervals that resample test subjects, and methods are compared fold by fold; a
+class resting on one person makes all of these depend on that person. *Change:* subjects are
+dealt into folds, and then into validation and training, by iterative stratification on the
+subject x exercise table (Sechidis, Tsoumakas & Vlahavas 2011), implemented in
+`uaar.data.splits.stratified_assign`. *Result:* every class has at least 3 validation, 5 test
+and 17 training subjects in every fold. *Unchanged:* subjects are disjoint between train,
+validation and test; fold sizes; the class splits. Only the list of exercises each subject
+performed is used, no signals and no results. *Cost:* the split files were regenerated and the
+fold-0 runs restarted; the runs made on the old folds (two class splits) are kept in
+`reports/runs/unstratified-fold0/` and are not used. This replaces the plain `GroupKFold` of
+`design/datasets.md` §6. Full write-up with the before and after tables, worded for the
+report and slides: `data-pipeline.md`, "Subject folds are stratified by exercise".

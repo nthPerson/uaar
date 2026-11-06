@@ -63,7 +63,7 @@ Approximate size: RecoFit exercise data are about 2,000 minutes, so about 120 k 
 
 ## 6. Splits
 
-- **Subjects:** 5-fold `GroupKFold` by subject on RecoFit (about 19 test subjects per fold). Inside each training fold, 15 % of subjects are held out for validation (early stopping, threshold selection, hyperparameters).
+- **Subjects:** 5 subject folds on RecoFit (about 19 test subjects per fold). Inside each training fold, 15 % of subjects are held out for validation (early stopping, threshold selection, hyperparameters). **Revised 2026-11-05:** the folds and the validation subsets are stratified by exercise with iterative stratification (Sechidis et al. 2011) instead of a plain `GroupKFold`, because RecoFit's participants did different exercise lists and unstratified folds left some classes with one or two validation subjects; see `../data-pipeline.md` and `../decisions.md`. Subjects remain disjoint between train, validation and test.
 - **Known / unknown classes:** from the eligible exercises, hold out about 25 % as unknown. Repeat with **3 random class splits** (seeds 0–2; 5 if time allows), plus **1 hand-picked "near-unknown" split** where each unknown exercise resembles a known one (for example, a curl variant held out while another curl is known), chosen after reading the label list. **(verify)**
 - **Leakage rules:** unknown-class windows never appear in training or validation, in any fold. Test windows (known and unknown) come only from the test subjects of that fold.
 - **RecGym:** 5 folds of 2 subjects each; its own known/unknown class splits by the same rules.

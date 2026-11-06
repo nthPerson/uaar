@@ -14,6 +14,10 @@
 - Ulmer, D., Hardmeier, C., & Frellsen, J. (2023). *Prior and Posterior Networks: A Survey on Evidential Deep Learning Methods for Uncertainty Estimation.* TMLR. https://arxiv.org/abs/2110.03051 (EDL caveats)
 - Bendale, A., & Boult, T. E. (2016). *Towards Open Set Deep Networks* (OpenMax). CVPR. https://arxiv.org/abs/1511.06233
 
+## Experimental method
+
+- Sechidis, K., Tsoumakas, G., & Vlahavas, I. (2011). *On the Stratification of Multi-Label Data.* ECML PKDD, LNCS 6913, 145–158. https://doi.org/10.1007/978-3-642-23808-6_10 (iterative stratification, used for the subject folds; implemented from the paper's description in `uaar.data.splits`)
+
 ## Uncertainty and open-set recognition for activity recognition
 
 - ★ Yao, S., Zhao, Y., Shao, H., Zhang, A., Zhang, C., Li, S., & Abdelzaher, T. (2018). *RDeepSense: Reliable Deep Mobile Computing Models with Uncertainty Estimations.* https://arxiv.org/abs/1709.02980
