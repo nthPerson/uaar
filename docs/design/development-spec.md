@@ -210,7 +210,7 @@ class Method(Protocol):
 | `backbone.py` | `ConvBackbone(nn.Module)` exactly as [models.md §1](models.md#1-shared-backbone-m2m4), `head` left to the subclass; `count_params()`, `count_macs()` (analytic, by layer) | — |
 | `logreg.py` | sklearn `Pipeline(StandardScaler, LogisticRegression(multinomial, l2))`; C chosen by `GridSearchCV` with `GroupKFold(3)` on training subjects over C ∈ {0.01, 0.1, 1, 10} | `msp`, `entropy` |
 | `softmax.py` | `SoftmaxNet` = backbone + linear; cross-entropy with class weights; training loop in `train_loop.py` (shared with EDL): AdamW, cosine schedule, early stopping on val macro-F1, `history.csv` | `msp`, `entropy` |
-| `edl.py` | `EDLNet` = backbone + evidence head (`softplus` default); `edl_loss(alpha, y_onehot, lam) -> Tensor` (Bayes-risk MSE + λ·KL(Dir(α̃)‖Dir(1)), closed-form KL); `edl_loss_digamma` for the ablation; λ_t annealing in the loop | `vacuity`, `one_minus_max`, optional `dissonance` |
+| `edl.py` | `EDLNet` = backbone + evidence head (`softplus` default); `edl_loss(alpha, y_onehot, lam) -> Tensor` (Bayes-risk MSE + λ·KL(Dir(α̃)‖Dir(1)), closed-form KL); `edl_loss_digamma` (the default since 2026-11-05, `docs/decisions.md`); λ_t annealing in the loop | `vacuity`, `one_minus_max`, optional `dissonance` |
 | `mcdropout.py` | `MCDropout(softmax_run_dir, T)`: loads a `SoftmaxNet`, `enable_dropout_only()` (sets `nn.Dropout` to train, keeps `BatchNorm` in eval, asserted in a test), T passes, `p̄`, entropy, mutual information, variation ratio | `entropy`, `mi`, `varratio` |
 | `train_loop.py` | `fit(model, loss_fn, loaders, cfg, run_dir) -> History`; class-weighted loss (`inv_sqrt`) by default, `balanced_sampler` as the alternative | — |
 | `normalize.py` | `fit_stats(X_train) -> dict`; `apply(X, stats)`; written to `preprocess.json` | — |
@@ -260,7 +260,7 @@ model: {dropout: 0.3}
 eval: {accept_rate: 0.95}
 ```
 
-Method files add only what differs, for example `configs/p1/edl.yaml`: `method: edl`, `model.edl: {evidence: softplus, loss: mse, kl_anneal_epochs: 10}`.
+Method files add only what differs, for example `configs/p1/edl.yaml`: `method: edl`, `model.edl: {evidence: softplus, loss: digamma, kl_anneal_epochs: 10}` (`loss: mse` until 2026-11-05; see `docs/decisions.md`).
 
 ## 6. Experiment plan and compute budget
 

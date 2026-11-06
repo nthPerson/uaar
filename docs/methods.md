@@ -13,7 +13,8 @@ code works (development-spec §8.2); the tables below point at the implementatio
 ## M3 evidential deep learning (Robert)
 
 - Evidence and Dirichlet: `uaar.models.edl.EDLNet` (`alpha = softplus(z) + 1`), `dirichlet_summary`.
-- Loss Eq. 5 + λ_t · Eq. 7: `edl_loss`; digamma variant Eq. 4: `edl_loss_digamma`; KL closed form: `kl_dirichlet_uniform`; annealing `kl_anneal`.
+- Loss Eq. 4 (digamma form, the default since 2026-11-05) + λ_t · Eq. 7: `edl_loss_digamma`; squared-error variant Eq. 5: `edl_loss`; log marginal likelihood Eq. 3: `edl_loss_log`; KL closed form: `kl_dirichlet_uniform`; annealing `kl_anneal`, λ_t = `kl_weight` · min(1, epoch / `kl_anneal_epochs`).
+- Why not Eq. 5, and the variants tried: `decisions.md`, 2026-11-05, "EDL trains with the digamma loss".
 - Scores: vacuity `K / S`, `1 - max p̂`.
 - Section text: to be written by Robert after the fold-0 run.
 

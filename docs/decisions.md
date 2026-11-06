@@ -118,3 +118,45 @@ fold-0 runs restarted; the runs made on the old folds (two class splits) are kep
 `reports/runs/unstratified-fold0/` and are not used. This replaces the plain `GroupKFold` of
 `design/datasets.md` §6. Full write-up with the before and after tables, worded for the
 report and slides: `data-pipeline.md`, "Subject folds are stratified by exercise".
+
+**EDL trains with the digamma loss, not the squared-error loss** (`configs/p1/edl.yaml`:
+`loss: digamma`; Robert asked for this to be tested on 2026-11-05 after the diagnostics below,
+and for alternatives to be tried). *Problem:* with the paper's preferred loss (Eq. 5, squared
+error) and its 10-epoch KL ramp, EDL did not train on the 28 known classes. On the four fold-0
+class splits the test macro-F1 was 0.19 to 0.31 (softmax: 0.67 to 0.77), and in three of the
+four runs early stopping kept the weights of the first epoch, because validation macro-F1 fell
+as the KL weight ramped in. With early stopping off and a 60-epoch ramp the squared-error loss
+still reached only 0.55 macro-F1 on `near`, and more than half of the windows had zero evidence
+for every class (vacuity exactly 1, every probability 1/28). *Change:* the expected
+cross-entropy loss (Eq. 4 of Sensoy et al. 2018, the digamma form) with the same KL term and
+the same 10-epoch ramp. *Result (fold 0, seed 0, four class splits):* macro-F1 0.72, 0.64, 0.66,
+0.70 (mean 0.68, softmax 0.72); unknown AUROC by vacuity 0.59, 0.62, 0.70, 0.58 (mean 0.62,
+softmax 0.59, MC Dropout 0.66); training takes about two minutes per run. *Weak spot:* the
+expected probabilities are far too low for the accuracy, ECE 0.36 to 0.41 (softmax 0.08).
+
+Variants tried on fold 0, seed 0 (`near` / `rand0`; runs in `reports/runs/edl-debug/`, not in
+any table). `kl_weight` is the value the KL weight ramps to (the paper uses 1).
+
+| EDL variant | macro-F1 | ECE | unknown AUROC (vacuity) | non-exercise AUROC | misclassification AUROC |
+|---|---|---|---|---|---|
+| digamma, `kl_weight` 1 (default) | 0.723 / 0.643 | 0.409 / 0.358 | 0.585 / 0.624 | 0.768 / 0.754 | 0.855 / 0.784 |
+| digamma, `kl_weight` 0.1 | 0.752 / 0.642 | 0.213 / 0.220 | 0.571 / 0.576 | 0.769 / 0.717 | 0.818 / 0.749 |
+| digamma, `kl_weight` 0.01 | 0.730 / 0.647 | 0.114 / 0.096 | 0.566 / 0.618 | 0.720 / 0.667 | 0.782 / 0.674 |
+| digamma, `kl_weight` 0 (no KL term) | 0.676 / 0.634 | 0.107 / 0.073 | 0.524 / 0.624 | 0.659 / 0.628 | 0.649 / 0.586 |
+| log marginal likelihood (Eq. 3), `kl_weight` 1 | 0.713 / 0.593 | 0.374 / 0.362 | 0.597 / 0.599 | 0.776 / 0.744 | 0.866 / 0.800 |
+| digamma, exponential evidence | 0.715 / 0.620 | 0.217 / 0.278 | 0.574 / 0.568 | 0.790 / 0.743 | 0.872 / 0.802 |
+| softmax, 1 − max p (for reference) | 0.774 / 0.667 | 0.076 / 0.078 | 0.586 / 0.542 | 0.799 / 0.730 | 0.857 / 0.793 |
+
+What the variants show: (1) no variant detects unknowns better than the default; (2) the KL
+weight trades calibration against the quality of vacuity: lowering it brings ECE down to the
+softmax level, but vacuity then separates wrong from right predictions, and exercise from
+non-exercise, worse; (3) with the full KL weight the Dirichlet has evidence for one class only,
+so vacuity, 1 − max p̂, entropy, mutual information and differential entropy rank the windows
+the same way (unknown AUROC equal to within 0.002), and a different score cannot help; with a
+low KL weight they differ, and 1 − max p̂ is then the better score for misclassification.
+One fold, one seed and two class splits: differences of a few points between variants are not
+established. *Open for Robert:* keep `kl_weight` 1 for the main comparison (the published
+schedule, best vacuity, poor ECE) and report the KL weight as an ablation, or adopt 0.1.
+Code: `kl_weight` and `loss: log` were added to `uaar.models.edl` for these runs. The runs made
+with the squared-error loss are kept in `reports/runs/edl-mse-fold0/` and are not used.
+

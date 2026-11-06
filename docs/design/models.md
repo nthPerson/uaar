@@ -73,6 +73,7 @@ Sensoy, Kaplan & Kandemir (2018): the network outputs non-negative **evidence** 
   - plus λ_t · KL( Dir(α̃) ‖ Dir(1) ), where α̃ = y + (1 − y) ⊙ α removes the true class's evidence, so only misleading evidence is penalized;
   - annealing λ_t = min(1, epoch / 10).
 - **Ablations:** the log-likelihood (digamma) variant of the loss; annealing length; interaction with class weights.
+- **Status 2026-11-05:** the squared-error loss did not train on the 28 known classes, so the digamma variant is the default and the squared-error loss is the ablation (`docs/decisions.md`).
 - **Known failure modes:** evidence collapse early in training; over-regularization from the KL term, which lowers known-class accuracy; sensitivity to class imbalance. Watch known-class macro-F1 against M2 on the validation subjects.
 - **Link to Robert's research:** Robert already works with EDL (vacuity-based uncertainty in a perception proof of concept); this project applies it to wearable time series.
 
