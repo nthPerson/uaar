@@ -145,8 +145,12 @@ def test_metrics_recomputable_from_saved_preds(evaluated):
 
 
 def test_make_tables(evaluated):
-    tmp, _, _, env = evaluated
+    tmp, run_dir, _, env = evaluated
     out_dir = tmp / "tables"
+    # a run set aside in a subfolder must not be counted
+    aside = tmp / "runs" / "aside" / run_dir.name
+    aside.mkdir(parents=True)
+    (aside / "metrics.json").write_text((run_dir / "metrics.json").read_text())
     cmd = [
         sys.executable, "scripts/make_tables.py", "--runs-dir", str(tmp / "runs"),
         "--out", str(out_dir),

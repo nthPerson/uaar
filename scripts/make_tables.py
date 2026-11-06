@@ -5,10 +5,12 @@ Owner: Sirena. AI assistance recorded in docs/ai-use-log.md.
 
     uv run scripts/make_tables.py [--runs-dir reports/runs] [--out reports/tables]
 
-Globs ``<runs-dir>/**/metrics.json``, flattens each to one row per run x set x score
-(``metrics_long.csv``), and writes ``t2_headline.md`` / ``t2_headline.csv``: per method, the
-mean ± sd over runs of macro-F1, ECE (test_known), AUROC and FPR@95 (``--unknown-set``, default
-test_unknown) and AURC (test_known), each for the method's primary score in ``PRIMARY_SCORE``.
+Reads ``<runs-dir>/<run_id>/metrics.json`` (direct children only, so runs set aside in a
+subfolder such as ``smoke/`` or ``edl-debug/`` stay out of the tables), flattens each to one row
+per run x set x score (``metrics_long.csv``), and writes ``t2_headline.md`` /
+``t2_headline.csv``: per method, the mean ± sd over runs of macro-F1, ECE (test_known), AUROC
+and FPR@95 (``--unknown-set``, default test_unknown) and AURC (test_known), each for the
+method's primary score in ``PRIMARY_SCORE``.
 No significance tests or bootstrap intervals here (``uaar.eval.stats``, Robert).
 """
 
@@ -106,7 +108,7 @@ def main() -> int:
     ap.add_argument("--unknown-set", default="test_unknown", help="set for AUROC and FPR@95")
     args = ap.parse_args()
 
-    files = sorted(args.runs_dir.glob("**/metrics.json"))
+    files = sorted(args.runs_dir.glob("*/metrics.json"))
     if not files:
         print(f"no metrics.json under {args.runs_dir}")
         return 1
