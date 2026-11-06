@@ -132,3 +132,46 @@ def test_train_and_evaluate_logreg(tmp_path):
     m = json.loads((run_dir / "metrics.json").read_text())
     assert m["method"] == "logreg" and set(m["score_names"]) == {"msp", "entropy"}
     assert m["test_known"]["closed_set"]["accuracy"] > 0.9
+
+
+def test_sweep_runs_all_methods_and_skips_finished_runs(tmp_path):
+    import yaml
+
+    _make_dataset(tmp_path / "data")
+    env = {**os.environ, "UAAR_DATA_DIR": str(tmp_path / "data")}
+    sweep = tmp_path / "sweep.yaml"
+    sweep.write_text(
+        yaml.safe_dump(
+            {
+                "folds": [0],
+                "class_splits": ["rand0"],
+                "seeds": [0],
+                "methods": ["softmax", "mcdropout", "edl", "logreg"],
+            }
+        )
+    )
+    cmd = [
+        sys.executable, "scripts/sweep.py", str(sweep), "--runs-dir", str(tmp_path / "runs"),
+        "--sets", "test_known", "test_unknown",
+        "--set", "train.epochs=2", "train.batch_size=32", "model.mcdropout.T=3",
+        "model.logreg.C_grid=[1.0]", "model.logreg.n_jobs=1",
+    ]  # fmt: skip
+    out = subprocess.run(cmd, env=env, capture_output=True, text=True)
+    assert out.returncode == 0, out.stdout + out.stderr
+    assert "4 run, 0 skipped, 0 failed" in out.stdout
+    for method in ("softmax", "mcdropout", "edl", "logreg"):
+        run_dir = tmp_path / "runs" / f"p1_recofit_{method}_fold0_rand0_seed0"
+        m = json.loads((run_dir / "metrics.json").read_text())
+        assert m["method"] == method and m["split_id"] == "fold0_rand0"
+    again = subprocess.run(cmd, env=env, capture_output=True, text=True)
+    assert again.returncode == 0 and "0 run, 4 skipped, 0 failed" in again.stdout
+
+    bad = tmp_path / "bad.yaml"
+    bad.write_text(
+        yaml.safe_dump(
+            {"folds": [0], "class_splits": ["rand0"], "seeds": [0], "methods": ["mcdropout"]}
+        )
+    )
+    out = subprocess.run([sys.executable, "scripts/sweep.py", str(bad)], env=env, text=True,
+                         capture_output=True)  # fmt: skip
+    assert out.returncode != 0 and "softmax before mcdropout" in out.stderr

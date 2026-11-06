@@ -1,0 +1,6 @@
+# Fold 0 of P1, every class split, one seed, all four methods (milestone M2).
+# near first: its models are the ones the wearable tests and the live demo use.
+folds: [0]
+class_splits: [near, rand0, rand1, rand2]
+seeds: [0]
+methods: [softmax, mcdropout, edl, logreg]
