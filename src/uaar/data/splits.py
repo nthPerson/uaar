@@ -14,6 +14,15 @@ Design choices where the spec is open:
   equal sizes) assigns rank ``r`` to fold ``r % n_folds``, so the result is deterministic and
   honours ``seed``. Validation subjects are then drawn from each fold's training subjects with
   the same generator.
+* **Class-stratified folds** (``stratify_classes``, used for RecoFit since 2026-11-05). RecoFit
+  is four subject cohorts, each with its own exercise list, so a class has data from only 25 to
+  44 of the 94 subjects. Folds drawn without regard to that leave some classes with one or two
+  validation or test subjects. With ``stratify_classes`` the subjects are assigned by iterative
+  stratification (Sechidis, Tsoumakas & Vlahavas 2011) on the subject x class table: the class
+  with the fewest unassigned subjects is dealt out first, each subject going to the fold that
+  still lacks the most subjects of that class. The same procedure then separates validation from
+  training subjects inside each fold. Only the list of exercises a subject performed is used,
+  never the signals, and a subject still belongs to exactly one of train/val/test.
 * The ``near`` split has no seed; its ``class_split_seed`` is stored as ``null``.
 * **Class source.** RecoFit's single-exercise file is a copy of the labelled segments of its
   multi-activity file, so taking exercise windows from both sources would count every sample
@@ -56,6 +65,7 @@ class Split:
     unknown_classes: list[str]
     eligibility: dict = field(default_factory=dict)
     class_source: str | None = None
+    fold_strategy: str = "random"
     created_by: str = "unknown"
 
     @property
@@ -232,8 +242,78 @@ def near_unknown_split(
 
 
 # ---- Subject folds -------------------------------------------------------------------------
+def stratified_assign(
+    subjects: Sequence[str],
+    members: dict[str, set[str]],
+    proportions: Sequence[float],
+    rng: np.random.Generator,
+) -> dict[str, int]:
+    """Deal subjects into bins so that every class's subjects are spread in ``proportions``.
+
+    Iterative stratification for multi-label data (Sechidis, Tsoumakas & Vlahavas 2011), with
+    subjects as the examples and "has windows of class c" as the labels.
+
+    Args:
+        subjects: The subjects to assign (each exactly once).
+        members: ``{class: set of subjects that have it}``; subjects outside ``subjects`` are
+            ignored.
+        proportions: Share of each bin, summing to 1 (``[1/k] * k`` for k folds,
+            ``[1 - val_frac, val_frac]`` for a train/validation separation).
+        rng: Decides the order subjects are dealt in and breaks exact ties.
+
+    Returns:
+        ``{subject: bin index}``. The class with the fewest unassigned subjects is handled
+        first; each of its subjects goes to the bin that still lacks the most subjects of that
+        class (ties: the bin that lacks the most subjects overall, then a random one).
+        Subjects with no class at all are dealt out last, to the bins lacking the most subjects.
+    """
+    subjects = sorted(set(subjects))
+    props = np.asarray(proportions, dtype=np.float64)
+    pool = set(subjects)
+    members = {c: set(m) & pool for c, m in members.items()}
+    members = {c: m for c, m in members.items() if m}
+    classes_of: dict[str, list[str]] = {s: [] for s in subjects}
+    for c in sorted(members):
+        for s in members[c]:
+            classes_of[s].append(c)
+    want = {c: len(m) * props for c, m in members.items()}  # subjects of c still wanted per bin
+    want_total = len(subjects) * props
+    order = [subjects[i] for i in rng.permutation(len(subjects))]
+    left = dict.fromkeys(order)  # insertion-ordered set of unassigned subjects
+    out: dict[str, int] = {}
+
+    def place(s: str, key: np.ndarray) -> None:
+        best = np.flatnonzero(np.isclose(key, key.max()))
+        if len(best) > 1:
+            t = want_total[best]
+            best = best[np.isclose(t, t.max())]
+        b = int(best[0] if len(best) == 1 else rng.choice(best))
+        out[s] = b
+        del left[s]
+        want_total[b] -= 1
+        for c in classes_of[s]:
+            want[c][b] -= 1
+
+    while left:
+        remaining = {c: [s for s in left if s in m] for c, m in members.items()}
+        remaining = {c: r for c, r in remaining.items() if r}
+        if not remaining:
+            for s in list(left):
+                place(s, want_total)
+            break
+        c = min(remaining, key=lambda k: (len(remaining[k]), k))
+        for s in remaining[c]:
+            place(s, want[c])
+    return out
+
+
 def make_subject_folds(
-    meta: pd.DataFrame, n_folds: int = 5, val_frac: float = 0.15, seed: int = 0
+    meta: pd.DataFrame,
+    n_folds: int = 5,
+    val_frac: float = 0.15,
+    seed: int = 0,
+    stratify_classes: Sequence[str] | None = None,
+    source: str | None = None,
 ) -> list[dict]:
     """Subject-level folds with a validation subset carved out of each fold's training subjects.
 
@@ -243,6 +323,11 @@ def make_subject_folds(
         val_frac: Fraction of each fold's non-test subjects held out for validation
             (``round(val_frac * n_train)``, at least 1 when there are at least 2 subjects).
         seed: Seed for the subject shuffle and the validation draw (see module docstring).
+        stratify_classes: When given, folds and validation subsets are stratified so that the
+            subjects of each of these classes are spread evenly (:func:`stratified_assign`;
+            needs ``label`` in ``meta``). ``None`` gives the unstratified folds.
+        source: With ``stratify_classes``: only windows of this ``source`` count as "the
+            subject has the class".
 
     Returns:
         List of ``n_folds`` dicts with sorted ``train_subjects``, ``val_subjects`` and
@@ -252,6 +337,30 @@ def make_subject_folds(
     if len(subjects) < n_folds:
         raise ValueError(f"{len(subjects)} subjects cannot form {n_folds} folds")
     rng = np.random.default_rng(seed)
+    if stratify_classes is not None:
+        rows = meta[meta["label"].astype(str).isin(set(stratify_classes))]
+        if source is not None:
+            rows = rows[rows["source"].astype(str) == source]
+        members = {
+            str(c): set(g.astype(str))
+            for c, g in rows.groupby(rows["label"].astype(str))["subject"]
+        }
+        fold_of = stratified_assign(subjects.tolist(), members, [1.0 / n_folds] * n_folds, rng)
+        folds = []
+        for k in range(n_folds):
+            pool = sorted(s for s in subjects if fold_of[s] != k)
+            part = stratified_assign(pool, members, [1.0 - val_frac, val_frac], rng)
+            val = sorted(s for s in pool if part[s] == 1)
+            if not val and len(pool) >= 2:  # keep the "at least one" rule of the plain folds
+                val = [pool[int(rng.integers(len(pool)))]]
+            folds.append(
+                {
+                    "train_subjects": sorted(set(pool) - set(val)),
+                    "val_subjects": val,
+                    "test_subjects": sorted(s for s in subjects if fold_of[s] == k),
+                }
+            )
+        return folds
     perm = rng.permutation(len(subjects))
     rank = np.empty(len(subjects), dtype=np.int64)
     rank[perm] = np.arange(len(subjects))  # rank[i] = position of subject i in the shuffle
@@ -290,6 +399,7 @@ def write_splits(
     exclude: Iterable[str] = (),
     class_source: str | None = None,
     tied: Iterable[Sequence[str]] = (),
+    stratify_folds: bool = False,
 ) -> list[Path]:
     """Write every ``fold{k}_{classsplit}.json`` for a dataset (spec §3.3).
 
@@ -310,6 +420,8 @@ def write_splits(
             docstring); stored in every split file and honoured by :func:`select`.
         tied: Groups of classes kept on the same side in the random splits
             (see :func:`make_class_split`); the ``near`` split is hand-written and ignores it.
+        stratify_folds: Stratify the subject folds over the eligible classes (see the module
+            docstring); recorded in each file as ``fold_strategy``.
 
     Returns:
         Paths of the written files, in ``(fold, class split)`` order.
@@ -333,7 +445,14 @@ def write_splits(
         known, unknown = near_unknown_split(classes, near_pairs)
         class_splits.append(("near", None, known, unknown))
 
-    folds = make_subject_folds(meta, n_folds=n_folds, val_frac=val_frac, seed=fold_seed)
+    folds = make_subject_folds(
+        meta,
+        n_folds=n_folds,
+        val_frac=val_frac,
+        seed=fold_seed,
+        stratify_classes=classes if stratify_folds else None,
+        source=class_source,
+    )
     sha = git_sha()
     written: list[Path] = []
     for k, fold in enumerate(folds):
@@ -351,6 +470,7 @@ def write_splits(
                 unknown_classes=unknown,
                 eligibility={"min_subjects": int(min_subjects), "min_minutes": float(min_minutes)},
                 class_source=class_source,
+                fold_strategy="class_stratified" if stratify_folds else "random",
                 created_by=sha,
             )
             path = out_dir / f"{split.split_id}.json"

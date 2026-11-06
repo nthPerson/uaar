@@ -132,6 +132,7 @@ Companion `recordings.meta.json`: `dataset`, `sample_rate_hz`, `units`, `labels`
   "unknown_classes": ["..."],
   "eligibility": {"min_subjects": 20, "min_minutes": 5.0},
   "class_source": "single",
+  "fold_strategy": "class_stratified",
   "created_by": "<git sha>"
 }
 ```

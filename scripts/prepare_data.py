@@ -95,6 +95,7 @@ def step_splits(dataset: str, p: dict, cfg: Config, force: bool, near_file: Path
             exclude=cfg.get("split.nonexercise_labels", []) or [],
             class_source=cfg.get("split.class_source"),
             tied=tied,
+            stratify_folds=bool(cfg.get("split.stratify_folds", False)),
         )
     first = json.loads(written[0].read_text())
     n_eligible = len(first["known_classes"]) + len(first["unknown_classes"])

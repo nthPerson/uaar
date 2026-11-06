@@ -149,6 +149,7 @@ def test_write_splits_files_and_schema(written):
         "unknown_classes",
         "eligibility",
         "class_source",
+        "fold_strategy",
         "created_by",
     ]
     assert d["dataset"] == "recofit"
@@ -332,3 +333,79 @@ def test_write_splits_honours_tied(meta, tmp_path):
     for path in paths:
         u = sp.load_split(path).unknown_classes
         assert ("Curl" in u) == ("Squat" in u)
+
+
+# ---- Class-stratified subject folds ---------------------------------------------------------
+def _cohort_meta() -> pd.DataFrame:
+    """Four cohorts with their own exercises, like RecoFit: 44, 30, 25 and 21 subjects."""
+    rows, start = [], 0
+    for cohort, n in enumerate((44, 30, 25, 21)):
+        for i in range(start, start + n):
+            for k in range(3):
+                rows.append((f"{i:03d}", "single", f"c{cohort}_{k}"))
+            rows.append((f"{i:03d}", "multi", "Non-Exercise"))
+        start += n
+    # a few subjects of the first cohort also did the third cohort's exercises
+    rows += [(f"{i:03d}", "single", f"c2_{k}") for i in range(5) for k in range(3)]
+    meta = pd.DataFrame(rows, columns=["subject", "source", "label"])
+    meta.insert(0, "window_id", np.arange(len(meta)))
+    return meta
+
+
+def _subjects_per_class(meta, subjects, classes):
+    m = meta[meta["subject"].isin(subjects) & meta["label"].isin(classes)]
+    return m.groupby("label")["subject"].nunique().reindex(classes, fill_value=0)
+
+
+def test_stratified_folds_spread_every_class():
+    meta = _cohort_meta()
+    classes = sorted(c for c in meta["label"].unique() if c != "Non-Exercise")
+    total = _subjects_per_class(meta, set(meta["subject"]), classes)
+    folds = sp.make_subject_folds(meta, 5, 0.15, seed=0, stratify_classes=classes, source="single")
+    everyone = sorted(meta["subject"].unique())
+    assert sorted(s for f in folds for s in f["test_subjects"]) == everyone
+    for f in folds:
+        tr, va, te = (set(f[k]) for k in ("train_subjects", "val_subjects", "test_subjects"))
+        assert not (tr & va or tr & te or va & te) and sorted(tr | va | te) == everyone
+        assert abs(len(te) - len(everyone) / 5) <= 2
+        test = _subjects_per_class(meta, te, classes)
+        val = _subjects_per_class(meta, va, classes)
+        # every class has close to a fifth of its subjects in test, 15 % of the rest in val
+        assert ((test - total / 5).abs() <= 1.0).all(), test.to_dict()
+        assert ((val - 0.15 * (total - test)).abs() <= 1.5).all(), val.to_dict()
+        assert (val >= 2).all()
+
+    again = sp.make_subject_folds(meta, 5, 0.15, 0, stratify_classes=classes, source="single")
+    assert again == folds
+    other = sp.make_subject_folds(meta, 5, 0.15, 1, stratify_classes=classes, source="single")
+    assert other != folds
+
+    # the plain folds on the same data are less even: that is the problem being fixed
+    plain = sp.make_subject_folds(meta, 5, 0.15, seed=0)
+    worst_plain = min(_subjects_per_class(meta, f["val_subjects"], classes).min() for f in plain)
+    worst = min(_subjects_per_class(meta, f["val_subjects"], classes).min() for f in folds)
+    assert worst >= worst_plain
+
+
+def test_stratified_assign_handles_subjects_without_classes_and_proportions():
+    rng = np.random.default_rng(0)
+    subjects = [f"s{i}" for i in range(20)]
+    members = {"a": set(subjects[:10]), "b": set(subjects[5:12])}
+    out = sp.stratified_assign(subjects, members, [0.75, 0.25], rng)
+    assert sorted(out) == sorted(subjects) and set(out.values()) == {0, 1}
+    assert sum(v == 1 for v in out.values()) == 5
+    assert 2 <= sum(out[s] == 1 for s in members["a"]) <= 3
+    assert 1 <= sum(out[s] == 1 for s in members["b"]) <= 2
+
+
+def test_write_splits_records_fold_strategy(tmp_path):
+    meta = _cohort_meta()
+    kw = dict(n_folds=5, class_split_seeds=(0,), min_subjects=20, min_minutes=0.0)
+    kw |= dict(exclude=["Non-Exercise"], class_source="single")
+    a = sp.load_split(sp.write_splits(meta, tmp_path / "a" / "splits", **kw)[0])
+    b = sp.load_split(
+        sp.write_splits(meta, tmp_path / "b" / "splits", stratify_folds=True, **kw)[0]
+    )
+    assert a.fold_strategy == "random" and b.fold_strategy == "class_stratified"
+    assert a.known_classes == b.known_classes  # the class split does not depend on the folds
+    assert a.test_subjects != b.test_subjects
