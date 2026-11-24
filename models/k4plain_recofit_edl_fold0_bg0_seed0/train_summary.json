@@ -1,0 +1,9 @@
+{
+  "run_id": "k4plain_recofit_edl_fold0_bg0_seed0",
+  "train_seconds": 5.983375230978709,
+  "val_accuracy": 0.9968152866242038,
+  "tau": {
+    "vacuity": 0.47720643132925034,
+    "one_minus_max": 0.4971470355987549
+  }
+}

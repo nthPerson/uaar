@@ -1,0 +1,17 @@
+{
+  "arch": "ConvBackbone",
+  "n_classes": 4,
+  "in_channels": 6,
+  "dropout": 0.3,
+  "classes": [
+    "Jumping Jacks",
+    "Lateral Raise",
+    "Shoulder Press (dumbbell)",
+    "Two-arm Dumbbell Curl (both arms, not alternating)"
+  ],
+  "seed": 0,
+  "method": "mcdropout",
+  "T": 30,
+  "share_trunk": true,
+  "source_run": "k4plain_recofit_softmax_fold0_bg0_seed0"
+}

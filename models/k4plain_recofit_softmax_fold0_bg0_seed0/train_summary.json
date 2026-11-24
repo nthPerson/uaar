@@ -1,0 +1,9 @@
+{
+  "run_id": "k4plain_recofit_softmax_fold0_bg0_seed0",
+  "train_seconds": 5.517651895992458,
+  "val_accuracy": 1.0,
+  "tau": {
+    "msp": 0.2838289111852645,
+    "entropy": 0.7073922872543335
+  }
+}

@@ -5,6 +5,9 @@ reports/runs/**
 !reports/runs/**/config.yaml
 *.pt
 *.joblib
+# final models are tracked (scripts/export_model.py, scripts/finetune.py)
+!models/**/*.pt
+!models/**/*.joblib
 
 # python
 .venv/

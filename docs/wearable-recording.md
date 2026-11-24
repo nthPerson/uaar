@@ -58,17 +58,18 @@ between sets; the recorder keeps streaming, only button-delimited sets are label
 ## After the session: fine-tune and test across the two of us
 
 ```bash
-uv run scripts/finetune.py --run reports/runs/k4taught_recofit_edl_fold0_bg0_seed0 \
+uv run scripts/finetune.py --run models/k4taught_recofit_edl_fold0_bg0_seed0 \
     --train data/wearable/W01 --test data/wearable/W02      # and again with W01 and W02 swapped
-uv run scripts/finetune.py --run reports/runs/k4taught_recofit_softmax_fold0_bg0_seed0 \
+uv run scripts/finetune.py --run models/k4taught_recofit_softmax_fold0_bg0_seed0 \
     --train data/wearable/W01 --test data/wearable/W02      # also saves the MC Dropout model
-uv run scripts/finetune.py --run reports/runs/k4plain_recofit_softmax_fold0_bg0_seed0 \
+uv run scripts/finetune.py --run models/k4plain_recofit_softmax_fold0_bg0_seed0 \
     --train data/wearable/W01 --test data/wearable/W02      # the plain softmax card
 ```
 
 Each call prints and saves a before/after table (`report.md` in the new run directory): known
 accuracy, the share of known windows kept, and the share of unknown-movement windows accepted,
-for the RecoFit-only model and the fine-tuned one. The fine-tuned run directories load in the
+for the RecoFit-only model and the fine-tuned one. The fine-tuned models are written to
+`models/` (tracked in git: commit them after the session) and load in the
 live page: put them in `configs/demo.yaml`. Recipe: `uaar.models.finetune`.
 
 ## Session log

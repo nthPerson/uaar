@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Fine-tune a RecoFit-trained model on our own wearable recordings and report before/after.
 
-    uv run scripts/finetune.py --run reports/runs/k4taught_recofit_edl_fold0_bg0_seed0 \
+    uv run scripts/finetune.py --run models/k4taught_recofit_edl_fold0_bg0_seed0 \
         --train data/wearable/W01 --test data/wearable/W02
 
 ``--run`` is a trained softmax or EDL run directory. ``--train`` and ``--test`` are subject
@@ -14,7 +14,8 @@ on their known-exercise sets, and a taught model also keeps being told to be unc
 their background movements. Validation is the last set of every label; it gives early
 stopping and the new rejection thresholds.
 
-Output, a run directory the live page can load (``configs/demo.yaml``):
+Output, in ``models/`` (tracked in git), a run directory the live page can load
+(``configs/demo.yaml``):
 
     <out>/model.pt, config.json, preprocess.json   the fine-tuned model
     <out>/threshold.json                           thresholds from the wearable validation sets
@@ -140,7 +141,7 @@ def main() -> int:
     ap.add_argument("--train", type=Path, nargs="+", required=True, help="subject folder(s)")
     ap.add_argument("--test", type=Path, nargs="*", default=[], help="subject folder(s)")
     ap.add_argument("--roles", type=Path, default=ROOT / "configs" / "wearable.yaml")
-    ap.add_argument("--out", type=Path, default=None, help="default: <run>_ft-<train subjects>")
+    ap.add_argument("--out", type=Path, default=None, help="default: models/<run>_ft-<subjects>")
     ap.add_argument("--full", action="store_true", help="also train the convolutional trunk")
     ap.add_argument("--epochs", type=int, default=60)
     ap.add_argument("--lr", type=float, default=1e-3)
@@ -158,7 +159,7 @@ def main() -> int:
     background = getattr(source, "background", "none")
     classes = list(source.classes)
     tag = "+".join(p.name for p in args.train)
-    out = args.out or args.run.with_name(f"{args.run.name}_ft-{tag}")
+    out = args.out or ROOT / "models" / f"{args.run.name}_ft-{tag}"
 
     Xw, tw = subject_windows(args.train, roles)
     check_classes(tw, classes, "--train")

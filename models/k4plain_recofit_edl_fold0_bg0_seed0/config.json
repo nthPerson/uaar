@@ -1,0 +1,20 @@
+{
+  "arch": "EDLNet",
+  "n_classes": 4,
+  "in_channels": 6,
+  "dropout": 0.3,
+  "evidence": "softplus",
+  "classes": [
+    "Jumping Jacks",
+    "Lateral Raise",
+    "Shoulder Press (dumbbell)",
+    "Two-arm Dumbbell Curl (both arms, not alternating)"
+  ],
+  "seed": 0,
+  "method": "edl",
+  "loss": "digamma",
+  "kl_anneal_epochs": 10,
+  "kl_weight": 1.0,
+  "background": "none",
+  "background_weight": 0.5
+}

@@ -231,3 +231,25 @@ def test_demo_script_builds_cards_from_its_config(tmp_path):
     assert demo.replay_file(tmp_path / "s") == tmp_path / "s" / "raw.csv"
     with pytest.raises(FileNotFoundError):
         demo.replay_file(tmp_path / "nope.csv")
+
+
+def test_export_model_copies_what_is_needed_to_load(tmp_path):
+    import importlib.util
+
+    import pytest
+
+    spec = importlib.util.spec_from_file_location("export_model", "scripts/export_model.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+
+    run = _softmax_run(tmp_path, ["Curl", "Press", "Raise", "Jacks"])
+    (run / "preds_val.parquet").write_text("big")
+    (run / "metrics.json").write_text("{}")
+    out = mod.export(run, tmp_path / "models")
+    names = {p.name for p in out.iterdir()}
+    assert {"model.pt", "config.json", "preprocess.json", "threshold.json", "metrics.json"} == names
+    X = np.zeros((6, 100), dtype=np.float32)
+    assert RunPredictor(out).predict(X)["label"] in ["Curl", "Press", "Raise", "Jacks"]
+    (tmp_path / "empty").mkdir()
+    with pytest.raises(FileNotFoundError, match="not a finished run"):
+        mod.export(tmp_path / "empty", tmp_path / "models")

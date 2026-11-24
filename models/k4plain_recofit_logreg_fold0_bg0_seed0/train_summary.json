@@ -1,0 +1,9 @@
+{
+  "run_id": "k4plain_recofit_logreg_fold0_bg0_seed0",
+  "train_seconds": 8.141549772990402,
+  "val_accuracy": 0.9601910828025477,
+  "tau": {
+    "msp": 0.10008448362350442,
+    "entropy": 0.33746444135904263
+  }
+}

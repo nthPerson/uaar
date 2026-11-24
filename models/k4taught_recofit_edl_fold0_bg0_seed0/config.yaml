@@ -1,0 +1,54 @@
+dataset: recofit
+protocol: k4taught
+method: edl
+data:
+  window_s: 2.0
+  hop_s: 1.0
+  purity: 0.8
+  channels:
+  - ax
+  - ay
+  - az
+  - gx
+  - gy
+  - gz
+  augment: false
+split:
+  n_folds: 5
+  val_frac: 0.15
+  frac_unknown: 0.25
+  min_subjects: 25
+  min_minutes: 10.0
+  nonexercise_labels:
+  - Non-Exercise
+  - Rest
+  - Walk
+  class_source: single
+  stratify_folds: true
+train:
+  epochs: 60
+  batch_size: 256
+  lr: 0.001
+  weight_decay: 0.0001
+  patience: 8
+  class_weighting: inv_sqrt
+  num_workers: 0
+model:
+  dropout: 0.3
+  edl:
+    evidence: softplus
+    loss: digamma
+    kl_anneal_epochs: 10
+eval:
+  accept_rate: 0.95
+background:
+  mode: uncertain
+  weight: 1.0
+  n_exercise: 8000
+  n_nonex: 4000
+  n_val_exercise: 1200
+  n_val_nonex: 600
+  seed: 0
+run_id: k4taught_recofit_edl_fold0_bg0_seed0
+git_sha: cca2006-dirty
+seed: 0

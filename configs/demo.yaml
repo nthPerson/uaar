@@ -6,10 +6,11 @@
 # measure, formula   optional: the name and plain-words formula of the score shown under the
 #          bar (defaults per score in uaar.live.predictors.score_info)
 #
-# The models are the fold-0 four-exercise runs (decisions.md, 2026-11-23): the softmax network
+# The models are in models/, which is tracked in git, so the page runs from a fresh clone:
+# the fold-0 four-exercise RecoFit models (decisions.md, 2026-11-23): the softmax network
 # trained on the four exercises only, and MC Dropout and EDL taught to be uncertain on other
-# movements. Train them with `uv run scripts/sweep.py configs/sweeps/k4.yaml` (reports/ is not
-# in git).
+# movements. After a recording session, point `run` at the fine-tuned models that
+# scripts/finetune.py writes to models/.
 labels:
   "Two-arm Dumbbell Curl (both arms, not alternating)": "Curl"
   "Shoulder Press (dumbbell)": "Shoulder press"
@@ -19,15 +20,15 @@ cards:
   - name: plain
     title: "Softmax network"
     subtitle: "Trained on the four exercises only"
-    run: reports/runs/k4plain_recofit_softmax_fold0_bg0_seed0
+    run: models/k4plain_recofit_softmax_fold0_bg0_seed0
     score: msp
   - name: mcdropout
     title: "MC Dropout"
     subtitle: "Also taught to be unsure about other movements"
-    run: reports/runs/k4taught_recofit_mcdropout_fold0_bg0_seed0
+    run: models/k4taught_recofit_mcdropout_fold0_bg0_seed0
     score: entropy
   - name: edl
     title: "Evidential network"
     subtitle: "Also taught to be unsure about other movements"
-    run: reports/runs/k4taught_recofit_edl_fold0_bg0_seed0
+    run: models/k4taught_recofit_edl_fold0_bg0_seed0
     score: vacuity
