@@ -928,7 +928,8 @@ $('btn-download').addEventListener('click', () => {
   log(`downloaded raw.csv (${recorder.samples.length} samples), events.csv (${recorder.sets.length} sets), meta.json; put them in one folder for uaar.data.wearable.load_session`);
 });
 
-// websocket
+// websocket: default to the server that served this page (scripts/demo.py)
+$('ws-url').value = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`;
 $('btn-ws').addEventListener('click', () => {
   if (wsClient.ws) wsClient.disconnect();
   else wsClient.connect($('ws-url').value.trim());

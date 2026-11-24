@@ -1,30 +1,60 @@
-# UAAR wearable console (`web/`)
+# UAAR web pages (`web/`)
 
-A single-page browser console for the UAAR wrist wearable. It talks to the device over Web
-Bluetooth, shows the live IMU stream, records labelled sets into the same three files that
-`scripts/record_wearable.py` writes, and forwards samples to a local prediction backend over a
-WebSocket so the live open-set classifier can be shown side by side.
+Two pages, served together with the predictions by one command:
 
-Vanilla JavaScript ES modules, no build step, no CDN or network dependencies.
+```bash
+uv run scripts/demo.py                                      # http://localhost:8000
+uv run scripts/demo.py --replay data/wearable/W01/test-60s  # plays a recording on load
+```
+
+| page | for | what it does |
+| --- | --- | --- |
+| `/` (`index.html`) | the presentation | upload a sensor stream, show each model's answer and uncertainty |
+| `/record.html` | data collection | the full console: live charts, device commands, labelled recording |
+
+Vanilla JavaScript ES modules, no build step, no CDN or network dependencies (the pages work
+with no internet in the room). Open them in **Edge or Chrome**; Web Bluetooth needs
+`http://localhost` or https, and `file://` does not work.
 
 | file | role |
 | --- | --- |
-| `index.html`, `style.css` | layout; dark, large type for a projector |
-| `protocol.js` | wire protocol (constants, `decodeBatch`, `encodeBatch`, `decodeStatus`, `toPhysical`, `seqGap`, `sampleToCsvLine`); mirrors `firmware/include/protocol.h` and `src/uaar/data/wearable.py` |
-| `app.js` | BLE link, charts, recorder, WebSocket client, prediction panel, simulator |
+| `index.html`, `demo.css`, `demo.js` | the demo page |
+| `record.html`, `style.css`, `app.js` | the recording console (BLE link, charts, recorder, simulator) |
+| `protocol.js` | wire protocol shared by both (constants, `decodeBatch`, `encodeBatch`, `decodeStatus`, `toPhysical`, `seqGap`, `parseCsvLine`); mirrors `firmware/include/protocol.h` and `src/uaar/data/wearable.py` |
 | `test/protocol.test.mjs` | `node:test` suite for `protocol.js` (run by `tests/test_web_protocol.py` when `node` exists) |
 
-## Serve and open
+## Demo page (`/`)
 
-Web Bluetooth needs a secure context; `http://localhost` counts, so no TLS is required.
+One screen, no scrolling, light and large for a projector. It meets the course requirement
+"upload data, show prediction, explain output" with two steps:
 
-```bash
-uv run scripts/serve_web.py            # http://localhost:8000/
-uv run scripts/serve_web.py --port 8080
-```
+1. **Upload.** Either **Connect wearable** (the kit streams over Bluetooth; the page shows the
+   device name, an arrow into the app, samples per second, samples uploaded and samples lost) or
+   **Upload a recording** (a `raw.csv` written by either recorder; it is sent at the pace it was
+   recorded). The trace shows the last 10 s of the accelerometer.
+2. **Prediction and uncertainty.** One card per model in `configs/demo.yaml`: the model's
+   answer (an exercise, or **Unknown** in red), its uncertainty on a 0-100 % bar with the
+   model's limit marked, and the last 30 answers as a strip. A model answers unknown when its
+   uncertainty is over its limit. The bar is the model's own score divided by the largest value
+   that score can take (`uaar.live.predictors.score_scale`), so the three bars are comparable
+   in direction but not in meaning: each model's limit is set from its own validation data.
 
-Open the URL in **Chrome or Edge** (Windows, macOS, Linux, Android). Opening `index.html` as a
-`file://` URL does not work: ES modules and Web Bluetooth both need an HTTP origin.
+Nothing needs clicking once a source is connected. The page connects to the prediction server
+by itself and reconnects if the server restarts; a dropped Bluetooth link is retried ten times.
+With `--replay` the recording starts as soon as the page opens, which is the fallback on stage.
+`?speed=4` in the address plays an uploaded recording four times faster (for testing).
+
+For the presentation, open the page before the talk and connect the wearable; an Edge app
+window (`msedge --app=http://localhost:8000`) has no address bar or tabs.
+
+Exercise colours are fixed by class order (`--c0` ... in `demo.css`); with more than eight
+classes the chips are grey.
+
+# Recording console (`/record.html`)
+
+A single-page console for the UAAR wrist wearable. It talks to the device over Web Bluetooth,
+shows the live IMU stream, records labelled sets into the same three files that
+`scripts/record_wearable.py` writes, and can show the predictions of the same server.
 
 ## Connect to the wearable
 
@@ -113,8 +143,8 @@ open when recording stops is closed at the last recorded sample (the serial reco
 
 ## WebSocket: live prediction panel
 
-The page is a WebSocket **client**. Enter the backend URL (default `ws://localhost:8765`) and
-click **Connect**. Until a backend accepts the connection the panel reads "backend not connected".
+The page is a WebSocket **client**. The backend URL defaults to the server that served the
+page (`ws://localhost:8000/ws` with `scripts/demo.py`); click **Connect**. Until a backend accepts the connection the panel reads "backend not connected".
 
 Page -> backend, one message per IMU notification, raw integer counts:
 

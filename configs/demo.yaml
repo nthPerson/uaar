@@ -1,0 +1,30 @@
+# The live demo page (scripts/demo.py): one card per entry, left to right.
+#
+# run      a trained run directory (model, config.json, threshold.json)
+# score    which of the method's uncertainty scores the bar shows (default: its primary score)
+# title    what the audience reads; subtitle: one line on how the model was trained
+#
+# TEMPORARY: these are the 28-class fold-0 runs, used to build and test the page. They are
+# replaced by the four-exercise plain / taught runs when those are trained (decisions.md,
+# 2026-11-23).
+labels:
+  "Two-arm Dumbbell Curl (both arms, not alternating)": "Curl"
+  "Shoulder Press (dumbbell)": "Shoulder press"
+  "Lateral Raise": "Lateral raise"
+  "Jumping Jacks": "Jumping jacks"
+cards:
+  - name: plain
+    title: "Standard network"
+    subtitle: "Trained on the four exercises only"
+    run: reports/runs/p1_recofit_softmax_fold0_near_seed0
+    score: msp
+  - name: mcdropout
+    title: "MC Dropout"
+    subtitle: "Also taught to be unsure about other movements"
+    run: reports/runs/p1_recofit_mcdropout_fold0_near_seed0
+    score: entropy
+  - name: edl
+    title: "Evidential network"
+    subtitle: "Also taught to be unsure about other movements"
+    run: reports/runs/p1_recofit_edl_fold0_near_seed0
+    score: vacuity

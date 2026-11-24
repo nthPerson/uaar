@@ -10,10 +10,24 @@ MC Dropout); :class:`MotionEnergyPredictor` needs no model and is what the serve
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 from typing import Protocol
 
 import numpy as np
+
+
+def score_scale(score_name: str, n_classes: int) -> float:
+    """The largest value an uncertainty score can take, so scores can share a 0-1 scale.
+
+    ``1 - max p`` (``msp``, ``one_minus_max``) and the variation ratio reach ``1 - 1/K``,
+    entropy and mutual information reach ``ln K``, vacuity reaches 1. Unknown names give 1.
+    """
+    if score_name in ("msp", "one_minus_max", "varratio"):
+        return 1.0 - 1.0 / n_classes
+    if score_name in ("entropy", "mi"):
+        return math.log(n_classes)
+    return 1.0
 
 
 class Predictor(Protocol):
@@ -65,22 +79,43 @@ class RunPredictor:
         run_dir: A run directory with ``config.json``, the model file and ``threshold.json``.
         score: Which of the method's scores to show; defaults to its primary score
             (``uaar.models.factory.PRIMARY_SCORE``).
-        name: Card title on the page; defaults to the method name (``softmax``, ``edl``, ...).
+        name: Key of the card in the messages; defaults to the method name (``softmax``, ...).
         top: How many classes to include in ``probs`` (the most probable ones).
+        title: Card title shown on the page; defaults to ``name``.
+        subtitle: One line under the title (how the model was trained, for the audience).
+        labels: Optional class name -> short display name (``"Shoulder Press (dumbbell)"`` ->
+            ``"Shoulder press"``); classes not listed keep their name.
+
+    ``predict`` also returns ``u`` and ``tau_u``: the score and the threshold divided by the
+    score's largest possible value (:func:`score_scale`) and clipped to [0, 1], so the page can
+    draw every method's uncertainty on one 0-100 % bar.
     """
 
-    def __init__(self, run_dir: Path, score: str | None = None, name: str | None = None, top=5):
+    def __init__(
+        self,
+        run_dir: Path,
+        score: str | None = None,
+        name: str | None = None,
+        top=5,
+        title: str | None = None,
+        subtitle: str = "",
+        labels: dict[str, str] | None = None,
+    ):
         from uaar.models import factory
 
         run_dir = Path(run_dir)
         self.method = factory.load(run_dir)
         self.name = name or self.method.name
+        self.title = title or self.name
+        self.subtitle = subtitle
         self.score_name = score or factory.PRIMARY_SCORE[self.method.name]
         taus = json.loads((run_dir / "threshold.json").read_text())["tau"]
         if self.score_name not in taus:
             raise KeyError(f"{run_dir}: no threshold for {self.score_name!r}; has {list(taus)}")
         self.tau = float(taus[self.score_name])
-        self.classes = list(self.method.classes)
+        labels = labels or {}
+        self.classes = [labels.get(c, c) for c in self.method.classes]
+        self.scale = score_scale(self.score_name, len(self.classes))
         self.top = top
 
     def predict(self, X: np.ndarray) -> dict:
@@ -88,11 +123,14 @@ class RunPredictor:
         probs = pred.probs[0]
         k = int(probs.argmax())
         order = np.argsort(probs)[::-1][: self.top]
+        score = float(pred.scores[self.score_name][0])
         return {
             "label": self.classes[k],
             "p": float(probs[k]),
-            "score": float(pred.scores[self.score_name][0]),
+            "score": score,
             "tau": self.tau,
+            "u": min(1.0, max(0.0, score / self.scale)),
+            "tau_u": min(1.0, max(0.0, self.tau / self.scale)),
             "probs": {self.classes[i]: float(probs[i]) for i in order},
             "score_name": self.score_name,
         }

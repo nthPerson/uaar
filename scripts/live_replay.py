@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Replay a recorded session into the live backend as if a kit were streaming.
 
-    uv run scripts/live_replay.py data/wearable/W01/test-60s [--url ws://host:8765/ws] [--speed 1]
+    uv run scripts/live_replay.py data/wearable/W01/test-60s [--url ws://host:8000/ws] [--speed 1]
 
 Sends 5-sample batches at the recorded pace (``--speed 10`` for ten times faster) and prints
-every prediction the backend returns. This is the on-stage fallback and the way to test the
-backend without hardware.
+every prediction the backend returns: a way to test the backend from the terminal. (To see a
+recording in the page, use ``scripts/demo.py --replay``.)
 """
 
 from __future__ import annotations
@@ -70,7 +70,7 @@ def main() -> int:
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     ap.add_argument("session_dir", type=Path)
-    ap.add_argument("--url", default="ws://localhost:8765/ws")
+    ap.add_argument("--url", default="ws://localhost:8000/ws")
     ap.add_argument("--speed", type=float, default=1.0)
     ap.add_argument("--limit", type=float, default=None, help="replay only the first N seconds")
     args = ap.parse_args()

@@ -114,3 +114,100 @@ def test_run_predictor_wraps_a_run_directory(tmp_path):
         assert set(m) == {"softmax", "mcdropout"}
         for v in m.values():
             assert v["label"] in classes and v["unknown"] == (v["score"] > v["tau"])
+
+
+def test_scores_share_a_zero_to_one_scale(tmp_path):
+    import math
+
+    from uaar.live.predictors import score_scale
+
+    assert score_scale("msp", 4) == 0.75 and score_scale("varratio", 4) == 0.75
+    assert score_scale("entropy", 4) == math.log(4) == score_scale("mi", 4)
+    assert score_scale("vacuity", 4) == 1.0 and score_scale("something else", 4) == 1.0
+
+    classes = ["Two-arm Dumbbell Curl (both arms, not alternating)", "Press", "Raise", "Jacks"]
+    run = _softmax_run(tmp_path, classes)
+    X = np.random.default_rng(0).normal(0, 1, (6, 100)).astype(np.float32)
+    p = RunPredictor(
+        run,
+        name="plain",
+        title="Standard network",
+        subtitle="four exercises only",
+        labels={classes[0]: "Curl"},
+    )
+    assert p.classes == ["Curl", "Press", "Raise", "Jacks"] and p.title == "Standard network"
+    r = p.predict(X)
+    assert r["label"] in p.classes and set(r["probs"]) <= set(p.classes)
+    assert r["u"] == min(1.0, r["score"] / 0.75) and r["tau_u"] == 0.4 / 0.75
+    q = RunPredictor(run, score="entropy").predict(X)
+    assert 0.0 <= q["u"] <= 1.0 and abs(q["tau_u"] - 0.9 / math.log(4)) < 1e-9
+
+
+def test_one_app_serves_page_replay_and_cards(tmp_path):
+    web = tmp_path / "web"
+    web.mkdir()
+    (web / "index.html").write_text("<!doctype html><title>demo</title>")
+    (web / "demo.js").write_text("export {};")
+    rec = tmp_path / "raw.csv"
+    rec.write_text("# banner\nt_ms,ax,ay,az,gx,gy,gz,flags,seq\n0,0,0,4096,0,0,0,0,0\n")
+    run = _softmax_run(tmp_path, ["Curl", "Press", "Raise", "Jacks"])
+    p = RunPredictor(run, name="plain", title="Standard network", subtitle="s")
+
+    client = TestClient(make_app([p], web_dir=web, replay=rec))
+    assert "demo" in client.get("/").text
+    assert client.get("/demo.js").status_code == 200
+    assert client.get("/replay.csv").text == rec.read_text()
+    assert client.get("/health").json()["methods"] == ["plain"]
+    with client.websocket_connect("/ws") as ws:
+        status = json.loads(ws.receive_text())
+        assert status["replay"] is True and status["classes"] == p.classes
+        assert status["cards"] == [
+            {"name": "plain", "title": "Standard network", "subtitle": "s", "score_name": "msp"}
+        ]
+        ws.send_text(
+            json.dumps({"type": "samples", "session_id": 0, "samples": _stream(100, moving=True)})
+        )
+        m = json.loads(ws.receive_text())["methods"]["plain"]
+        assert 0.0 <= m["u"] <= 1.0 and m["tau_u"] == round(0.4 / 0.75, 4)
+
+    api_only = TestClient(make_app([p]))
+    assert api_only.get("/replay.csv").status_code == 404
+    with api_only.websocket_connect("/ws") as ws:
+        assert json.loads(ws.receive_text())["replay"] is False
+
+
+def test_demo_script_builds_cards_from_its_config(tmp_path):
+    import importlib.util
+
+    import pytest
+    import yaml
+
+    spec = importlib.util.spec_from_file_location("demo", "scripts/demo.py")
+    demo = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(demo)
+
+    run = _softmax_run(tmp_path, ["A long class name", "Press", "Raise", "Jacks"])
+    conf = tmp_path / "demo.yaml"
+    card = {"name": "plain", "title": "Standard network", "run": str(run), "score": "entropy"}
+    conf.write_text(
+        yaml.safe_dump(
+            {"labels": {"A long class name": "Curl"}, "cards": [card, {"run": str(run)}]}
+        )
+    )
+    a, b = demo.load_predictors(conf)
+    assert (a.name, a.title, a.score_name, a.classes[0]) == (
+        "plain",
+        "Standard network",
+        "entropy",
+        "Curl",
+    )
+    assert (b.name, b.title, b.score_name) == ("card1", "card1", "msp")
+
+    conf.write_text(yaml.safe_dump({"cards": [{"run": str(tmp_path / "missing")}]}))
+    with pytest.raises(FileNotFoundError, match="not a trained run directory"):
+        demo.load_predictors(conf)
+    (tmp_path / "s").mkdir()
+    (tmp_path / "s" / "raw.csv").write_text("x")
+    assert demo.replay_file(tmp_path / "s") == tmp_path / "s" / "raw.csv"
+    with pytest.raises(FileNotFoundError):
+        demo.replay_file(tmp_path / "nope.csv")
