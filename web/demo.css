@@ -188,7 +188,8 @@ button:focus-visible, .button:focus-visible, input:focus-visible + .button {
   gap: 0.35em;
   font-family: var(--display);
   font-weight: 700;
-  font-size: calc(4.2 * var(--u));
+  /* never larger than fits the longest class name on one line (set by fitAnswers) */
+  font-size: clamp(calc(1.6 * var(--u)), var(--answer-fit, 999px), calc(4.2 * var(--u)));
   line-height: 1.05;
   min-width: 0;
 }
@@ -206,7 +207,11 @@ button:focus-visible, .button:focus-visible, input:focus-visible + .button {
   background: repeating-linear-gradient(45deg, var(--critical) 0 4px, #f3c9c9 4px 8px);
 }
 
-.meter-head { display: flex; justify-content: space-between; align-items: baseline; }
+.meter-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 1em; }
+.measure { display: flex; flex-direction: column; gap: 0.1em; min-width: 0; }
+.measure strong { font-weight: 600; }
+/* two lines reserved, so a formula that wraps does not move one card's answer */
+.measure .formula { color: var(--ink-2); min-height: 2.5em; }
 .meter-head .value {
   font-family: var(--display);
   font-size: calc(1.9 * var(--u));

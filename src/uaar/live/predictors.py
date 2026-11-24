@@ -30,6 +30,27 @@ def score_scale(score_name: str, n_classes: int) -> float:
     return 1.0
 
 
+def score_info(method: str, score_name: str, passes: int | None = None) -> tuple[str, str]:
+    """``(name, plain-words formula)`` of an uncertainty score, for the audience.
+
+    The three demo models measure uncertainty differently; the page shows this line under each
+    bar so "uncertainty" is not read as one common quantity.
+    """
+    t = passes or 30
+    table = {
+        "msp": ("Least confidence", "1 − highest class probability"),
+        "one_minus_max": ("Least confidence", "1 − highest class probability"),
+        "vacuity": ("Vacuity", "number of classes ÷ total evidence"),
+        "varratio": ("Variation ratio", f"share of {t} dropout passes outvoted by the majority"),
+        "mi": ("Mutual information", f"disagreement between {t} dropout passes"),
+    }
+    if score_name == "entropy":
+        if method == "mcdropout":
+            return ("Predictive entropy", f"entropy of the average of {t} dropout passes")
+        return ("Entropy", "spread of the class probabilities")
+    return table.get(score_name, (score_name, ""))
+
+
 class Predictor(Protocol):
     name: str
     tau: float
@@ -85,6 +106,8 @@ class RunPredictor:
         subtitle: One line under the title (how the model was trained, for the audience).
         labels: Optional class name -> short display name (``"Shoulder Press (dumbbell)"`` ->
             ``"Shoulder press"``); classes not listed keep their name.
+        measure, formula: Name and plain-words formula of the score, shown under the bar;
+            default :func:`score_info`.
 
     ``predict`` also returns ``u`` and ``tau_u``: the score and the threshold divided by the
     score's largest possible value (:func:`score_scale`) and clipped to [0, 1], so the page can
@@ -100,6 +123,8 @@ class RunPredictor:
         title: str | None = None,
         subtitle: str = "",
         labels: dict[str, str] | None = None,
+        measure: str | None = None,
+        formula: str | None = None,
     ):
         from uaar.models import factory
 
@@ -116,6 +141,9 @@ class RunPredictor:
         labels = labels or {}
         self.classes = [labels.get(c, c) for c in self.method.classes]
         self.scale = score_scale(self.score_name, len(self.classes))
+        info = score_info(self.method.name, self.score_name, getattr(self.method, "T", None))
+        self.measure = measure or info[0]
+        self.formula = formula if formula is not None else info[1]
         self.top = top
 
     def predict(self, X: np.ndarray) -> dict:

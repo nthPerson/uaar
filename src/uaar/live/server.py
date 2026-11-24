@@ -8,7 +8,8 @@ client -> server
     {"type": "reset"}                      # clear the window buffer (new session / reconnect)
 server -> client
     {"type": "status", "text": "...", "methods": ["edl", ...], "window_s": 2.0, "hop_s": 1.0,
-     "cards": [{"name": "edl", "title": "EDL", "subtitle": "...", "score_name": "vacuity"}],
+     "cards": [{"name": "edl", "title": "EDL", "subtitle": "...", "score_name": "vacuity",
+                "measure": "Vacuity", "formula": "number of classes / total evidence"}],
      "classes": ["Curl", ...], "replay": false}
     {"type": "prediction", "t_start": 12.34, "t_end": 14.32, "session_id": 3,
      "session_active": true, "n_dropped": 0,
@@ -64,6 +65,8 @@ def make_app(
             "title": getattr(p, "title", p.name),
             "subtitle": getattr(p, "subtitle", ""),
             "score_name": getattr(p, "score_name", ""),
+            "measure": getattr(p, "measure", ""),
+            "formula": getattr(p, "formula", ""),
         }
         for p in preds
     ]

@@ -51,6 +51,8 @@ def load_predictors(config: Path) -> list[RunPredictor]:
                 title=card.get("title"),
                 subtitle=card.get("subtitle", ""),
                 labels=labels,
+                measure=card.get("measure"),
+                formula=card.get("formula"),
             )
         )
     return out

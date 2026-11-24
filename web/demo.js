@@ -152,7 +152,10 @@ class Card {
     this.meter = el('div', 'meter');
     const mh = el('div', 'meter-head');
     this.value = el('span', 'value', '');
-    mh.append(el('span', '', 'Uncertainty'), this.value);
+    const what = el('div', 'measure');
+    what.append(el('strong', '', info.measure ? `Uncertainty: ${info.measure.toLowerCase()}` : 'Uncertainty'));
+    if (info.formula) what.append(el('span', 'formula', info.formula));
+    mh.append(what, this.value);
     const track = el('div', 'track');
     this.fill = el('div', 'fill');
     this.limit = el('div', 'limit');
@@ -190,6 +193,7 @@ class Card {
     this.chip.className = `chip${m.unknown ? ' unknown' : ''}`;
     this.chip.style.setProperty('--chip', classColor(m.label));
     this.name.textContent = label;
+    this.name.title = label;
     this.answer.replaceChildren(this.chip, this.name);
 
     this.value.textContent = pct(m.u);
@@ -243,7 +247,32 @@ function buildCards(status) {
     state.cards.set(info.name, card);
     box.append(card.root);
   }
+  fitAnswers();
 }
+
+/**
+ * One answer size for all cards: the largest at which the longest class name (or "Unknown")
+ * fits on one line, so no answer is ever cut off and the size never jumps between answers.
+ */
+function fitAnswers() {
+  const first = state.cards.values().next().value;
+  if (!first) return;
+  const probe = el('span', 'answer');
+  probe.style.cssText = 'position:absolute;visibility:hidden;white-space:nowrap;font-size:100px';
+  document.body.append(probe);
+  let widest = 0;
+  for (const name of [...state.classes, 'Unknown']) {
+    probe.textContent = name;
+    widest = Math.max(widest, probe.getBoundingClientRect().width);
+  }
+  probe.remove();
+  const cs = getComputedStyle(first.root);
+  const inner = first.root.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+  // per 1px of font size: the text, plus the colour chip (0.62em) and its gap (0.35em)
+  const size = inner / (widest / 100 + 0.97);
+  $('cards').style.setProperty('--answer-fit', `${Math.floor(size)}px`);
+}
+window.addEventListener('resize', fitAnswers);
 
 // ---- Prediction server (the one that served this page) ------------------------------------------
 class Server {

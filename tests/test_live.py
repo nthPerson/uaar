@@ -139,8 +139,21 @@ def test_scores_share_a_zero_to_one_scale(tmp_path):
     r = p.predict(X)
     assert r["label"] in p.classes and set(r["probs"]) <= set(p.classes)
     assert r["u"] == min(1.0, r["score"] / 0.75) and r["tau_u"] == 0.4 / 0.75
-    q = RunPredictor(run, score="entropy").predict(X)
+    e = RunPredictor(run, score="entropy", measure="Spread", formula="")
+    q = e.predict(X)
     assert 0.0 <= q["u"] <= 1.0 and abs(q["tau_u"] - 0.9 / math.log(4)) < 1e-9
+    assert (p.measure, e.measure, e.formula) == ("Least confidence", "Spread", "")
+
+
+def test_score_info_names_each_models_measure():
+    from uaar.live.predictors import score_info
+
+    assert score_info("edl", "vacuity")[0] == "Vacuity"
+    assert score_info("softmax", "entropy")[0] == "Entropy"
+    name, formula = score_info("mcdropout", "entropy", passes=30)
+    assert name == "Predictive entropy" and "30 dropout passes" in formula
+    assert score_info("mcdropout", "mi", passes=10)[1] == "disagreement between 10 dropout passes"
+    assert score_info("x", "new_score") == ("new_score", "")
 
 
 def test_one_app_serves_page_replay_and_cards(tmp_path):
@@ -162,7 +175,14 @@ def test_one_app_serves_page_replay_and_cards(tmp_path):
         status = json.loads(ws.receive_text())
         assert status["replay"] is True and status["classes"] == p.classes
         assert status["cards"] == [
-            {"name": "plain", "title": "Standard network", "subtitle": "s", "score_name": "msp"}
+            {
+                "name": "plain",
+                "title": "Standard network",
+                "subtitle": "s",
+                "score_name": "msp",
+                "measure": "Least confidence",
+                "formula": "1 \u2212 highest class probability",
+            }
         ]
         ws.send_text(
             json.dumps({"type": "samples", "session_id": 0, "samples": _stream(100, moving=True)})
