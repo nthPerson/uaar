@@ -1,0 +1,17 @@
+# How the labels typed during a wearable recording session are used (scripts/finetune.py).
+# Protocol: docs/wearable-recording.md. Decided 2026-11-23 (docs/decisions.md).
+#
+# known       label typed at the recorder -> model class (the RecoFit activity name)
+# background  movements the taught models are fine-tuned to be uncertain on
+# unknown     movements never used for training: the test of "does it say unknown?"
+# shifted     a known exercise with the kit worn differently (test only) -> its class
+known:
+  curl: "Two-arm Dumbbell Curl (both arms, not alternating)"
+  shoulder_press: "Shoulder Press (dumbbell)"
+  lateral_raise: "Lateral Raise"
+  jumping_jacks: "Jumping Jacks"
+background: [standing_still, walking, arm_circles, shadow_boxing]
+unknown: [waving, torso_twists]
+shifted:
+  curl_rotated90: "Two-arm Dumbbell Curl (both arms, not alternating)"
+  curl_loose: "Two-arm Dumbbell Curl (both arms, not alternating)"

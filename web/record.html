@@ -69,7 +69,14 @@
       <section class="card" id="record-panel">
         <h2>Record <span id="rec-state" class="pill pill-muted">off</span></h2>
         <div class="form-grid">
-          <label>Label for next set <input id="rec-label" type="text" placeholder="e.g. Lateral Raise" autocomplete="off"></label>
+          <label>Label for next set <input id="rec-label" type="text" list="protocol-labels" placeholder="e.g. lateral_raise" autocomplete="off"></label>
+          <!-- the labels of the recording protocol (docs/wearable-recording.md, configs/wearable.yaml) -->
+          <datalist id="protocol-labels">
+            <option value="curl"><option value="shoulder_press"><option value="lateral_raise"><option value="jumping_jacks">
+            <option value="standing_still"><option value="walking"><option value="arm_circles"><option value="shadow_boxing">
+            <option value="waving"><option value="torso_twists">
+            <option value="curl_rotated90"><option value="curl_loose">
+          </datalist>
           <label>Subject <input id="rec-subject" type="text" placeholder="W01" autocomplete="off"></label>
           <label>Session <input id="rec-session" type="text" autocomplete="off"></label>
           <label>Placement <input id="rec-placement" type="text" value="left wrist, case arrow toward the elbow"></label>

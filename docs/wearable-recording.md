@@ -27,30 +27,49 @@ Flash: `uv tool run platformio run -d firmware -t upload --upload-port /dev/ttyA
    with the same label.
 4. `q` ends the session. Check `quicklook.png` before taking the kit off.
 
-Over BLE: open the browser page (`uv run scripts/serve_web.py`, Chrome or Edge on Windows),
-connect, enter subject and labels there, and download the three session files into
-`data/wearable/<subject>/<session>/`. The folder layout is identical.
+Over Bluetooth (no cable, needed for jumping jacks): start the pages with
+`uv run scripts/demo.py --no-models`, open `http://localhost:8000/record.html` in Edge or Chrome
+on Windows, click **Connect wearable**, enter the subject, pick each label from the list, and
+after **Stop recording** download the three session files into
+`data/wearable/<subject>/<session>/`. The folder layout is identical. Watch the "dropped"
+counter: a set with dropped samples should be recorded again.
 
-## Protocol (revised 2026-11-03, about 20 minutes per subject)
+## Protocol (revised 2026-11-23, about 20 minutes per subject)
 
-The known sets are labelled with the exact RecoFit activity names (decided 2026-11-05,
-`decisions.md`), so a recorded set maps to a model class without a lookup table. Type the label
-exactly as written; the recorder repeats the previous label on Enter.
+The models know four exercises (`decisions.md`, 2026-11-23). Type the short labels below;
+`configs/wearable.yaml` maps them to the model classes and says what each one is used for.
+The recorder repeats the previous label on Enter, and the browser page offers the list.
 
-| Block | Sets | Label | Notes |
+| Block | Sets | Label | Used for |
 |---|---|---|---|
-| Known 1 | 3 × 30–40 s | `Two-arm Dumbbell Curl (both arms, not alternating)` | both arms together; light dumbbells or filled water bottles |
-| Known 2 | 3 × 30–40 s | `Shoulder Press (dumbbell)` | same weight |
-| Known 3 | 3 × 30–40 s | `Lateral Raise` | same weight |
-| Known 4 | 3 × 30–40 s | `Squat (arms in front of body, parallel to ground)` | body weight, arms held straight out in front |
-| Known 5 | 3 × 30–40 s | `Jumping Jacks` | |
-| Unknown | 2 × 30 s each | `arm_circles`, `shadow_boxing`, `waving` | movements not in RecoFit |
-| Placement shift | 1 × 30 s each | `curl_rotated90`, `curl_loose` | the Known 1 exercise with the case rotated 90° on the wrist; with a loose strap |
-| Rest | 1 × 60 s each | `standing_still`, `walking` | non-exercise: the models should call these unknown |
+| Known 1 | 3 × 30–40 s | `curl` | two-arm dumbbell curl, both arms together; light dumbbells or filled water bottles |
+| Known 2 | 3 × 30–40 s | `shoulder_press` | dumbbell shoulder press, same weight |
+| Known 3 | 3 × 30–40 s | `lateral_raise` | same weight |
+| Known 4 | 3 × 30–40 s | `jumping_jacks` | over Bluetooth |
+| Rest | 2 × 45 s each | `standing_still`, `walking` | fine-tuning: the taught models learn to be uncertain on these |
+| Taught movements | 2 × 30 s each | `arm_circles`, `shadow_boxing` | fine-tuning: same |
+| Unknown movements | 2 × 30 s each | `waving`, `torso_twists` | **test only**, never trained on: the models should say unknown |
+| Placement shift | 1 × 30 s each | `curl_rotated90`, `curl_loose` | test only: the curl with the case rotated 90° on the wrist; with a loose strap |
 
-Labels in lower case with underscores are ours and are not model classes.
+Record at least two sets of every label that is used for fine-tuning: the last set of each
+label is held out for validation (early stopping and the rejection threshold). Rest 20–30 s
+between sets; the recorder keeps streaming, only button-delimited sets are labelled.
 
-Rest 20–30 s between sets; the recorder keeps streaming, only button-delimited sets are labelled.
+## After the session: fine-tune and test across the two of us
+
+```bash
+uv run scripts/finetune.py --run reports/runs/k4taught_recofit_edl_fold0_bg0_seed0 \
+    --train data/wearable/W01 --test data/wearable/W02      # and again with W01 and W02 swapped
+uv run scripts/finetune.py --run reports/runs/k4taught_recofit_softmax_fold0_bg0_seed0 \
+    --train data/wearable/W01 --test data/wearable/W02      # also saves the MC Dropout model
+uv run scripts/finetune.py --run reports/runs/k4plain_recofit_softmax_fold0_bg0_seed0 \
+    --train data/wearable/W01 --test data/wearable/W02      # the plain softmax card
+```
+
+Each call prints and saves a before/after table (`report.md` in the new run directory): known
+accuracy, the share of known windows kept, and the share of unknown-movement windows accepted,
+for the RecoFit-only model and the fine-tuned one. The fine-tuned run directories load in the
+live page: put them in `configs/demo.yaml`. Recipe: `uaar.models.finetune`.
 
 ## Session log
 
