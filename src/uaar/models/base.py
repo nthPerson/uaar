@@ -27,6 +27,23 @@ class Method(Protocol):
     def load(cls, run_dir: Path) -> Method: ...
 
 
+#: ``background.mode`` values (configs, docs/methods.md "Background windows in training").
+BACKGROUND_MODES = ("none", "uncertain", "other")
+
+
+def with_background(
+    Xtr: np.ndarray, ytr: np.ndarray, Xbg: np.ndarray, n_classes: int
+) -> tuple[np.ndarray, np.ndarray]:
+    """Append background windows to the training set with the marker label ``n_classes``.
+
+    The marker is not a class of its own unless the method makes it one (``mode: other``); the
+    taught losses only use it to tell background rows from known-class rows.
+    """
+    X = np.concatenate([np.asarray(Xtr, dtype=np.float32), np.asarray(Xbg, dtype=np.float32)])
+    y = np.concatenate([np.asarray(ytr, dtype=np.int64), np.full(len(Xbg), n_classes, np.int64)])
+    return X, y
+
+
 def entropy(probs: np.ndarray, eps: float = 1e-12) -> np.ndarray:
     """Shannon entropy per row, in nats."""
     p = np.clip(probs, eps, 1.0)

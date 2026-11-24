@@ -111,6 +111,8 @@ class MCDropoutMethod:
     ) -> MCDropoutMethod:
         """Wrap a fitted or loaded ``SoftmaxMethod`` (shares its network object)."""
         assert softmax.stats is not None, "the softmax method must be fitted or loaded"
+        if getattr(softmax, "background", "none") == "other":
+            raise ValueError("MC Dropout is not defined for the 'Other'-class softmax network")
         return cls(softmax.model, softmax.classes, softmax.stats, T=T, seed=seed, **kwargs)
 
     @classmethod
