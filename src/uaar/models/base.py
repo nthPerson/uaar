@@ -44,6 +44,36 @@ def with_background(
     return X, y
 
 
+def open_macro_f1(
+    y: np.ndarray, label: np.ndarray, score: np.ndarray, n_classes: int, accept: float = 0.95
+) -> float:
+    """Macro-F1 over the K known classes plus "rejected", for windows that include background.
+
+    The threshold is the ``accept`` quantile of the scores of the known rows (the rule tau is
+    chosen by); a row is predicted "rejected" when its score is above it, else ``label``.
+
+    Args:
+        y: ``(N,)`` true labels; ``n_classes`` marks a background row (true class "rejected").
+        label: ``(N,)`` predicted known class.
+        score: ``(N,)`` uncertainty score, higher = more uncertain.
+
+    This is what a taught model's checkpoint is selected on. Macro-F1 over the known classes
+    alone reaches 1.0 in the first epochs of a four-class problem and says nothing about
+    whether the model has learned to be uncertain on the background windows.
+    """
+    from sklearn.metrics import f1_score
+
+    y = np.asarray(y)
+    score = np.asarray(score, dtype=np.float64)
+    known = y < n_classes
+    if not known.any():
+        return float("nan")
+    tau = np.quantile(score[known], accept)
+    pred = np.where(score > tau, n_classes, np.asarray(label))
+    labels = np.arange(n_classes + 1)
+    return float(f1_score(y, pred, labels=labels, average="macro", zero_division=0))
+
+
 def entropy(probs: np.ndarray, eps: float = 1e-12) -> np.ndarray:
     """Shannon entropy per row, in nats."""
     p = np.clip(probs, eps, 1.0)

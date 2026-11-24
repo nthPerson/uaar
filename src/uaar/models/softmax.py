@@ -29,7 +29,14 @@ import torch.nn.functional as F
 
 from uaar.models import normalize
 from uaar.models.backbone import ConvBackbone
-from uaar.models.base import BACKGROUND_MODES, Prediction, class_weights, entropy, with_background
+from uaar.models.base import (
+    BACKGROUND_MODES,
+    Prediction,
+    class_weights,
+    entropy,
+    open_macro_f1,
+    with_background,
+)
 from uaar.models.train_loop import History, device_for, fit, predict_batches
 
 
@@ -57,7 +64,7 @@ def taught_cross_entropy(
         logits: ``(N, K)``.
         y: ``(N,)`` labels; ``n_classes`` marks a background row.
         class_weight: optional ``(K,)`` weights for the known-class term.
-        background_weight: weight of the background term (0.5, as in Hendrycks et al. 2019).
+        background_weight: weight of the background term.
 
     Each term is a mean over its own rows, so the balance does not depend on how many
     background rows a batch holds.
@@ -98,16 +105,29 @@ class SoftmaxMethod:
 
     def fit(self, Xtr, ytr, Xval, yval, cfg, run_dir: Path, background=None) -> None:
         """Train. ``background`` is ``(X_train, X_val)`` background windows, required unless
-        the mode is ``"none"`` (then it is ignored). Validation, for early stopping, uses the
-        known-class windows only, plus the validation background windows as the class "Other"
-        in mode ``"other"`` (so that macro-F1 covers all K + 1 outputs)."""
+        the mode is ``"none"`` (then it is ignored).
+
+        Early stopping and the choice of the best weights: macro-F1 on the known validation
+        windows in mode ``"none"``. In the two background modes the validation background
+        windows are added, so that the criterion also measures how they are handled: mode
+        ``"other"`` uses macro-F1 over all K + 1 outputs; mode ``"uncertain"`` uses
+        :func:`uaar.models.base.open_macro_f1` with ``msp`` as the score (the K classes plus
+        "rejected", threshold at ``cfg.eval.accept_rate`` of the known validation scores).
+        """
         K = len(self.classes)
+        val_metric = None
         if self.background != "none":
             if background is None:
                 raise ValueError(f"background mode {self.background!r} needs background windows")
             Xtr, ytr = with_background(Xtr, ytr, background[0], K)
-            if self.background == "other":
-                Xval, yval = with_background(Xval, yval, background[1], K)
+            Xval, yval = with_background(Xval, yval, background[1], K)
+        if self.background == "uncertain":
+            accept = float(cfg.get("eval.accept_rate", 0.95))
+
+            def val_metric(out, y):
+                p = F.softmax(out, dim=1).numpy()
+                return open_macro_f1(y, p.argmax(axis=1), 1.0 - p.max(axis=1), K, accept)
+
         self.stats = normalize.fit_stats(Xtr)
         Xtr_n, Xval_n = normalize.apply(Xtr, self.stats), normalize.apply(Xval, self.stats)
         device = device_for()
@@ -135,6 +155,7 @@ class SoftmaxMethod:
             patience=cfg.train.patience,
             num_workers=cfg.train.num_workers,
             device=device,
+            val_metric=val_metric,
         )
         self.history.write(run_dir / "history.csv")
 

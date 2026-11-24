@@ -18,7 +18,7 @@ import yaml
 from uaar.config import Config
 from uaar.data import splits
 from uaar.models import edl, factory
-from uaar.models.base import with_background
+from uaar.models.base import open_macro_f1, with_background
 from uaar.models.edl import EDLMethod
 from uaar.models.logreg import LogRegMethod
 from uaar.models.mcdropout import MCDropoutMethod
@@ -86,6 +86,45 @@ def test_taught_edl_loss_known_rows_are_the_ordinary_loss():
     assert edl.taught_edl_loss(alpha[:2], y[:2], K, lam=0.4, class_weights=w).item() == (
         pytest.approx(known.item())
     )
+
+
+def test_open_macro_f1_counts_background_rows_as_their_own_class():
+    y = np.array([0, 0, 1, 1, 2, 2, 2, 2])  # two known classes; 2 marks background rows
+    label = np.array([0, 0, 1, 0, 0, 1, 0, 1])
+    perfect = np.array([0.0, 0.1, 0.2, 0.3, 0.9, 0.8, 0.7, 0.95])
+    # threshold = the 100 % quantile of the known scores (0.3): every background row is above
+    assert open_macro_f1(y, label, perfect, 2, accept=1.0) == pytest.approx(
+        np.mean([2 * 2 / (2 + 3), 2 * 1 / (1 + 2), 1.0])  # F1 of class 0, class 1, rejected
+    )
+    useless = np.zeros(8)  # nothing is ever rejected: the "rejected" class scores 0
+    assert open_macro_f1(y, label, useless, 2, accept=1.0) < open_macro_f1(
+        y, label, perfect, 2, accept=1.0
+    )
+    assert math.isnan(open_macro_f1(np.array([2, 2]), np.array([0, 1]), np.zeros(2), 2))
+
+
+def test_train_loop_selects_on_the_given_validation_metric():
+    from uaar.models.softmax import SoftmaxNet
+    from uaar.models.train_loop import fit
+
+    X, y = _windows((0.5, 1.5, 2.5), 20, 0)
+    calls = []
+
+    def metric(out, yv):  # best at epoch 1, then worse
+        calls.append(tuple(out.shape))
+        return [0.1, 0.9, 0.5, 0.4][len(calls) - 1]
+
+    torch.manual_seed(0)
+    hist = fit(
+        SoftmaxNet(K),
+        lambda out, yy, epoch: F.cross_entropy(out, yy),
+        lambda out: F.softmax(out, dim=1),
+        X, y, X[:30], y[:30],
+        epochs=4, batch_size=16, patience=10, log=None, val_metric=metric,
+    )  # fmt: skip
+    assert calls == [(30, K)] * 4
+    assert hist.best_epoch == 1 and hist.best_val_f1 == 0.9
+    assert [r["val_macro_f1"] for r in hist.rows] == [0.1, 0.9, 0.5, 0.4]
 
 
 # ---- Methods on synthetic windows ----------------------------------------------------------------

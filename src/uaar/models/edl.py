@@ -254,19 +254,29 @@ class EDLMethod:
 
     def fit(self, Xtr, ytr, Xval, yval, cfg, run_dir, background=None) -> None:
         """Train. ``background`` is ``(X_train, X_val)`` background windows, required in mode
-        ``"uncertain"`` (only the training part is used; validation is known classes only)."""
+        ``"uncertain"``. In that mode early stopping and the choice of the best weights use
+        :func:`uaar.models.base.open_macro_f1` on the known plus background validation windows
+        with vacuity as the score, instead of macro-F1 on the known windows alone."""
         import numpy as np
 
         from uaar.models import normalize
-        from uaar.models.base import class_weights, with_background
+        from uaar.models.base import class_weights, open_macro_f1, with_background
         from uaar.models.train_loop import device_for, fit
 
         K = len(self.classes)
         w_np = class_weights(ytr, K, cfg.train.class_weighting)
+        val_metric = None
         if self.background == "uncertain":
             if background is None:
                 raise ValueError("background mode 'uncertain' needs background windows")
             Xtr, ytr = with_background(Xtr, ytr, background[0], K)
+            Xval, yval = with_background(Xval, yval, background[1], K)
+            accept = float(cfg.get("eval.accept_rate", 0.95))
+
+            def val_metric(alpha, y):
+                a = alpha.numpy()
+                return open_macro_f1(y, a.argmax(axis=1), K / a.sum(axis=1), K, accept)
+
         self.stats = normalize.fit_stats(Xtr)
         Xtr_n, Xval_n = normalize.apply(Xtr, self.stats), normalize.apply(Xval, self.stats)
         device = device_for()
@@ -296,6 +306,7 @@ class EDLMethod:
             num_workers=cfg.train.num_workers,
             device=device,
             extra_columns=lambda e: {"lambda_t": lam(e)},
+            val_metric=val_metric,
         )
         self.history.write(run_dir / "history.csv")
 

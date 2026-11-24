@@ -13,8 +13,8 @@ subfolder such as ``smoke/`` or ``edl-debug/`` stay out of the tables) and write
     AURC (test_known), AUROC, FPR@95 and the share accepted at tau (``--unknown-set``, default
     test_unknown), each for the method's primary score (``uaar.models.factory.primary_score``).
 ``scores_by_protocol.md/.csv``  per protocol, method and score: known accuracy, macro-F1, ECE,
-    the share of known test windows kept, and for every unknown set the share accepted at tau
-    and the AUROC. This is the table of the three tiers (k4plain, k4taught, k4other).
+    the share of known test windows kept, and for every unknown set the share accepted at tau,
+    FPR@95 and the AUROC. This is the table of the three tiers (k4plain, k4taught, k4other).
 
 Runs of different protocols are never averaged together. No significance tests or bootstrap
 intervals here (``uaar.eval.stats``, Robert).
@@ -141,7 +141,7 @@ def by_score(long: pd.DataFrame) -> pd.DataFrame:
                 for set_name in UNKNOWN_SETS:
                     sub = d[d["set"] == set_name]
                     short = set_name.removeprefix("test_")
-                    for key in ("accepted", "auroc"):
+                    for key in ("accepted", "auroc", "fpr95"):
                         row[f"{short}_{key}_mean"], row[f"{short}_{key}_sd"] = _mean_sd(
                             sub[key] if key in sub else []
                         )
@@ -153,8 +153,8 @@ def by_score_markdown(t: pd.DataFrame) -> str:
     cols = [
         ("Protocol", None), ("Method", None), ("Score", None), ("Runs", None),
         ("Known accuracy", "accuracy"), ("Known kept", "known_kept"),
-        ("Unknown accepted ↓", "unknown_accepted"), ("Unknown AUROC ↑", "unknown_auroc"),
-        ("Non-exercise accepted ↓", "nonex_accepted"),
+        ("Unknown accepted ↓", "unknown_accepted"), ("Unknown FPR@95 ↓", "unknown_fpr95"),
+        ("Unknown AUROC ↑", "unknown_auroc"), ("Non-exercise accepted ↓", "nonex_accepted"),
         ("Background accepted ↓", "background_accepted"),
         ("Look-alike accepted", "lookalike_accepted"), ("ECE ↓", "ece"),
     ]  # fmt: skip
@@ -168,7 +168,9 @@ def by_score_markdown(t: pd.DataFrame) -> str:
         "\nMean ± sd over runs (folds x class splits x seeds). `*` marks the method's primary "
         "score. Accepted = share of that set's test windows with score <= tau, where tau keeps "
         "95 % of the known validation windows; known kept = the same share for the known test "
-        "windows. Unknown = classes no model saw; non-exercise and background are categories "
+        "windows; FPR@95 = the accepted share when the threshold instead keeps 95 % of the "
+        "known test windows. Unknown = classes no model saw; non-exercise and background are "
+        "categories "
         "that taught and Other-class models saw in training, from other subjects; look-alike "
         "= variants of a known exercise.\n"
     )

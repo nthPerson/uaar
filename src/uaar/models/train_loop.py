@@ -1,7 +1,8 @@
 """Shared training loop for the neural methods (models.md §2).
 
-AdamW with cosine decay, class-weighted loss, early stopping on validation macro-F1 with
-patience, ``history.csv`` per epoch, best weights restored at the end. The loss function is
+AdamW with cosine decay, class-weighted loss, early stopping on validation macro-F1 (or on a
+``val_metric`` the method passes in) with patience, ``history.csv`` per epoch, best weights
+restored at the end. The loss function is
 passed in so softmax (cross-entropy) and EDL (Bayes risk + annealed KL) share everything else.
 """
 
@@ -90,11 +91,15 @@ def fit(
     device: torch.device | None = None,
     log: Callable[[str], None] | None = print,
     extra_columns: Callable[[int], dict] | None = None,
+    val_metric: Callable[[torch.Tensor, np.ndarray], float] | None = None,
 ) -> History:
     """Train ``model`` and return the History; the model ends with its best-validation weights.
 
     ``probs_fn`` maps raw outputs to class probabilities (softmax or alpha / S) for macro-F1.
     ``extra_columns(epoch)`` may add per-epoch values (for example lambda_t) to history.csv.
+    ``val_metric(raw_val_outputs, yval)`` replaces macro-F1 as the quantity that early stopping
+    and the choice of the best weights use (higher is better); it is still written to the
+    ``val_macro_f1`` column.
     """
     device = device or device_for()
     model.to(device)
@@ -125,11 +130,12 @@ def fit(
                     out_val.to(device), torch.from_numpy(yval.astype(np.int64)).to(device), epoch
                 ).item()
             )
-        val_f1 = (
-            float(f1_score(yval, val_probs.argmax(dim=1).numpy(), average="macro"))
-            if len(yval)
-            else float("nan")
-        )
+        if val_metric is not None:
+            val_f1 = float(val_metric(out_val, yval))
+        elif len(yval):
+            val_f1 = float(f1_score(yval, val_probs.argmax(dim=1).numpy(), average="macro"))
+        else:
+            val_f1 = float("nan")
         row = {
             "epoch": epoch,
             "train_loss": total / max(n, 1),
