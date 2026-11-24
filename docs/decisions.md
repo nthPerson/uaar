@@ -269,3 +269,21 @@ about 2,600 samples (4 %) while the kit was worn and moved; a 90 s comparison of
 and USB streams with the kit lying still lost none of 4,414. The firmware does not check
 whether a notification was accepted. The recording tools must show loss per set.
 
+## 2026-11-24
+
+**Checkpoint selection for the taught models is accepted** (Robert): they are selected on
+open-set validation macro-F1 (the entry of 2026-11-23). The report states the rule; it does
+not need to narrate how it was arrived at.
+
+**Headline metric: the share of windows accepted at the threshold** (Robert), for unknown
+exercises and for non-exercise, with known accuracy next to it. FPR@95 and AUROC stay in the
+tables as supporting numbers.
+
+**One dataset is enough.** The course handout (`Project_instruction.pdf`, read on this date)
+asks for "a real-life engineering problem ... and associated dataset" and for at least two
+related papers; it has no requirement for several datasets. Dropping MM-Fit and RecGym
+(2026-11-23) stands. The handout's report outline has eleven sections, "Individual
+contributions" is mandatory, AI use must be documented in the report, and the final
+presentation is described there as 10 to 15 slides in 10 minutes; the instructor has since set
+it at 6 to 7 minutes on Dec 3 (Robert), so the deck has seven slides.
+
