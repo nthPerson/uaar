@@ -27,18 +27,26 @@ Flash: `uv tool run platformio run -d firmware -t upload --upload-port /dev/ttyA
    with the same label.
 4. `q` ends the session. Check `quicklook.png` before taking the kit off.
 
-Over Bluetooth (no cable, needed for jumping jacks): start the pages with
-`uv run scripts/demo.py --no-models`, open `http://localhost:8000/record.html` in Edge or Chrome
-on Windows, click **Connect wearable**, enter the subject, pick each label from the list, and
-after **Stop recording** download the three session files into
-`data/wearable/<subject>/<session>/`. The folder layout is identical. Watch the "dropped"
-counter: a set with dropped samples should be recorded again.
+## Recording a session (Bluetooth, the recording page)
+
+This is the way to record the protocol; it needs no cable and one person can do it alone.
+
+1. `uv run scripts/demo.py` (add `--no-models` if `models/` is missing), then open
+   `http://localhost:8000/record.html` in Edge or Chrome on Windows.
+2. **Connect wearable**, set the person (Robert `W01`, Sirena `W02`), **Start session**.
+3. For each set the page says what is next. Press the kit's button: after a three-second
+   countdown the set is recorded and, by default, stops by itself (beeps mark start and end).
+   The page then moves to the next set of the checklist.
+4. Watch the "Lost" column: a set marked in red is discarded and recorded again.
+5. **Finish session**. The session is already in `data/wearable/<person>/<session>/`; commit it.
+
+Details of the page: `web/README.md`. The USB recorder above stays as the fallback.
 
 ## Protocol (revised 2026-11-23, about 20 minutes per subject)
 
 The models know four exercises (`decisions.md`, 2026-11-23). Type the short labels below;
 `configs/wearable.yaml` maps them to the model classes and says what each one is used for.
-The recorder repeats the previous label on Enter, and the browser page offers the list.
+The recording page shows this table as its checklist (the `protocol` list of the same file).
 
 | Block | Sets | Label | Used for |
 |---|---|---|---|

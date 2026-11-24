@@ -1,0 +1,99 @@
+/* Recording page: built on demo.css (tokens, buttons, traces). Denser than the demo page: it
+   is used at a desk, and from across the room only the "now" strip has to be readable. */
+body.record {
+  grid-template-rows: auto auto auto 1fr auto;
+  gap: calc(0.9 * var(--u));
+  font-size: clamp(13px, calc(0.95 * var(--u)), 18px);
+  overflow: auto;
+}
+.record h1 { font-size: calc(1.9 * var(--u)); }
+.record h2 { font-family: var(--display); font-weight: 600; font-size: 1.25em; margin: 0 0 0.5em; }
+.muted { color: var(--ink-2); }
+
+.setup { display: flex; align-items: flex-end; gap: calc(1.4 * var(--u)); flex-wrap: wrap; }
+.setup label { display: flex; flex-direction: column; gap: 0.2em; color: var(--ink-2); font-size: 0.9em; }
+.setup label.grow { flex: 1; min-width: 14em; }
+.setup input {
+  font: inherit;
+  font-size: 1.1em;
+  color: var(--ink);
+  padding: 0.35em 0.5em;
+  border: 2px solid var(--ink);
+  border-radius: 6px;
+  background: var(--surface);
+  width: 100%;
+}
+#subject { width: 6em; }
+.device { display: flex; flex-direction: column; min-width: 12em; }
+#device-name { font-family: var(--display); font-size: 1.3em; }
+.record .stats dd { font-size: 1.6em; }
+button:disabled { opacity: 0.4; cursor: default; }
+
+.traces { display: grid; grid-template-columns: 1fr 1fr; gap: calc(0.9 * var(--u)); }
+.traces .trace { margin: 0; }
+.traces canvas { height: 15vh; }
+
+/* ---- the "now" strip: what to do, readable from across the room ------------------------- */
+.now {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto auto;
+  gap: 0.5em 1.5em;
+  align-items: center;
+  padding: calc(0.9 * var(--u)) calc(1.3 * var(--u));
+  border: 2px solid var(--ink);
+  border-radius: 8px;
+  background: var(--surface);
+}
+.now-text { display: flex; flex-direction: column; gap: 0.1em; min-width: 0; }
+#now-title { font-family: var(--display); font-size: clamp(22px, calc(2.6 * var(--u)), 54px); line-height: 1.1; }
+#now-detail { color: var(--ink-2); font-size: 1.15em; }
+.now-actions { display: flex; gap: 0.6em; grid-row: 1 / span 2; grid-column: 2; }
+.now-actions button { font-size: 1.15em; }
+.now-progress { height: 10px; border-radius: 4px; background: var(--hairline); overflow: hidden; }
+#now-bar { height: 100%; width: 0; background: var(--ink); }
+.now.idle { border-color: var(--muted); }
+.now.idle #now-title { color: var(--ink-2); }
+.now.countdown { background: var(--ink); color: var(--surface); }
+.now.countdown #now-detail { color: var(--hairline); }
+.now.countdown #now-bar { background: var(--surface); }
+.now.recording { border-color: var(--critical); background: var(--band); }
+.now.recording #now-bar { background: var(--critical); }
+.now.recording #now-title::before {
+  content: "";
+  display: inline-block;
+  width: 0.55em;
+  height: 0.55em;
+  margin-right: 0.35em;
+  border-radius: 50%;
+  background: var(--critical);
+}
+
+/* ---- checklist and recorded sets ------------------------------------------------------------ */
+.work { display: grid; grid-template-columns: 3fr 2fr; gap: calc(0.9 * var(--u)); min-height: 0; }
+.panel {
+  padding: calc(0.9 * var(--u)) calc(1.1 * var(--u));
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  overflow: auto;
+}
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+th { text-align: left; font-weight: 400; color: var(--ink-2); padding: 0.2em 0.6em 0.4em 0; }
+td { padding: 0.35em 0.6em 0.35em 0; border-top: 1px solid var(--hairline); }
+#checklist tbody tr { cursor: pointer; }
+#checklist tbody tr:hover td { background: var(--page); }
+#checklist tr.current td { background: var(--band); font-weight: 600; }
+#checklist tr.done td { color: var(--muted); }
+#checklist td.label, #sets td.label { font-family: Consolas, "Cascadia Mono", monospace; }
+.sets-count.done::after { content: " ✓"; }
+#checklist input.seconds { width: 4.5em; font: inherit; padding: 0.1em 0.3em; border: 1px solid var(--muted); border-radius: 4px; }
+td.bad { color: var(--critical); font-weight: 600; }
+#sets button { font-size: 0.9em; padding: 0.2em 0.6em; border-width: 1px; }
+.options { margin-top: 1em; border: 1px solid var(--hairline); border-radius: 6px; display: flex; flex-direction: column; gap: 0.4em; }
+.options legend { color: var(--ink-2); padding: 0 0.4em; }
+.options input[type="number"] { width: 4em; font: inherit; }
+#summary { margin-top: 1em; padding: 0.8em 1em; border: 2px solid var(--ink); border-radius: 6px; }
+#summary code { font-family: Consolas, "Cascadia Mono", monospace; font-size: 0.9em; word-break: break-all; }
+#summary ul { margin: 0.4em 0; padding-left: 1.2em; }
+.legend a { color: var(--ink); }

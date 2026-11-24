@@ -22,6 +22,23 @@ class order, so the page can give every class a fixed colour. With ``web_dir`` t
 serves the page (``/``), and with ``replay`` it serves that recording at ``/replay.csv`` and
 tells the page to play it (``"replay": true``).
 
+With ``recorder`` (``uaar.live.recorder.SessionRecorder``) the socket also drives a recording
+session; the samples a client sends are written to disk while a session is open:
+
+client -> server
+    {"type": "rec_start", "subject": "W01", "placement": "...", "device": "UAAR-8428",
+     "firmware": "0.1.0"}
+    {"type": "set_start", "label": "curl"}   # the samples that follow belong to this set
+    {"type": "set_end"}                      # keep it;  {"type": "set_cancel"} drops it
+    {"type": "set_discard", "set_index": 3}
+    {"type": "rec_stop"}
+server -> client
+    {"type": "rec_state", "recording": true, "subject": ..., "session": ..., "sets": [...],
+     "protocol": [...], ...}                 # on connect and after every change
+    {"type": "set", ...}                     # the set just kept: seconds, samples, lost_share
+    {"type": "rec_summary", "saved": true, "folder": ..., "labels": [...], "missing": [...]}
+    {"type": "rec_error", "text": "..."}
+
 Run: ``uv run scripts/demo.py`` (page and predictions on port 8000).
 """
 
@@ -37,7 +54,45 @@ from fastapi.staticfiles import StaticFiles
 
 from uaar.data import wearable as w
 from uaar.live.predictors import MotionEnergyPredictor, Predictor
+from uaar.live.recorder import SessionRecorder
 from uaar.live.windower import LiveWindower
+
+RECORDER_MESSAGES = (
+    "rec_start",
+    "rec_stop",
+    "rec_state",
+    "set_start",
+    "set_end",
+    "set_cancel",
+    "set_discard",
+)
+
+
+def record_message(recorder: SessionRecorder, kind: str, msg: dict) -> list[dict]:
+    """Apply one recording message and return the replies (the new state, or an error)."""
+    try:
+        if kind == "rec_start":
+            recorder.start(
+                str(msg.get("subject", "")),
+                placement=str(msg.get("placement", "")),
+                device=str(msg.get("device", "")),
+                firmware=str(msg.get("firmware", "")),
+                transport=str(msg.get("transport", "ble")),
+            )
+        elif kind == "rec_stop":
+            return [recorder.stop(), recorder.state()]
+        elif kind == "set_start":
+            recorder.set_start(str(msg.get("label", "")), int(msg.get("session_id", 0) or 0))
+        elif kind == "set_end":
+            kept = recorder.set_end()
+            return ([{"type": "set", **kept}] if kept else []) + [recorder.state()]
+        elif kind == "set_cancel":
+            recorder.set_cancel()
+        elif kind == "set_discard":
+            recorder.discard(int(msg.get("set_index", -1)))
+    except ValueError as e:
+        return [{"type": "rec_error", "text": str(e)}, recorder.state()]
+    return [recorder.state()]
 
 
 def make_app(
@@ -46,6 +101,7 @@ def make_app(
     hop_s: float = 1.0,
     web_dir: Path | None = None,
     replay: Path | None = None,
+    recorder: SessionRecorder | None = None,
 ) -> FastAPI:
     """The live app: ``/ws`` and ``/health``, plus the page and a replay file when given.
 
@@ -53,6 +109,7 @@ def make_app(
         predictors: one per card on the page; the motion-energy placeholder when ``None``.
         web_dir: directory with ``index.html`` to serve at ``/`` (``None``: API only).
         replay: a recorded ``raw.csv`` the page plays on load, served at ``/replay.csv``.
+        recorder: writes recording sessions for ``/record.html`` (``None``: no recording).
     """
     preds: list[Predictor] = (
         list(predictors) if predictors is not None else [MotionEnergyPredictor()]
@@ -100,6 +157,8 @@ def make_app(
                 }
             )
         )
+        if recorder is not None:
+            await socket.send_text(json.dumps(recorder.state()))
         try:
             while True:
                 msg = json.loads(await socket.receive_text())
@@ -107,8 +166,14 @@ def make_app(
                 if kind == "reset":
                     windower.reset()
                     continue
+                if recorder is not None and kind in RECORDER_MESSAGES:
+                    for reply in record_message(recorder, kind, msg):
+                        await socket.send_text(json.dumps(reply))
+                    continue
                 if kind != "samples":
                     continue
+                if recorder is not None:
+                    recorder.add_samples(msg.get("samples", []))
                 for t0, t1, X, flags_any in windower.push(msg.get("samples", [])):
                     methods = {}
                     for p in preds:

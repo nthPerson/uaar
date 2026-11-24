@@ -3,6 +3,7 @@
 // uncertainty. Vanilla ES module, no dependencies. The recording console is record.html.
 
 import * as P from './protocol.js';
+import { Trace, Wearable } from './link.js';
 
 const $ = (id) => document.getElementById(id);
 const fmt = (n) => n.toLocaleString('en-US');
@@ -71,59 +72,10 @@ function ingest(sessionId, samples) {
 }
 
 // ---- Signal trace: accelerometer x, y, z, last 10 s ---------------------------------------------
-class Trace {
-  constructor(canvas) {
-    this.canvas = canvas;
-    this.ctx = canvas.getContext('2d');
-    this.cap = TRACE_SECONDS * P.SAMPLE_RATE_HZ;
-    this.buf = [];
-    this.range = 1.5; // g, grows and shrinks slowly with the signal
-    this.dirty = true;
-    new ResizeObserver(() => this.resize()).observe(canvas);
-    this.resize();
-    const loop = () => { if (this.dirty) this.draw(); requestAnimationFrame(loop); };
-    requestAnimationFrame(loop);
-  }
-  clear() { this.buf = []; this.dirty = true; }
-  push(s) {
-    this.buf.push(s);
-    if (this.buf.length > this.cap) this.buf.shift();
-    this.dirty = true;
-  }
-  resize() {
-    const r = this.canvas.getBoundingClientRect();
-    const dpr = window.devicePixelRatio || 1;
-    this.canvas.width = Math.max(1, Math.round(r.width * dpr));
-    this.canvas.height = Math.max(1, Math.round(r.height * dpr));
-    this.dirty = true;
-  }
-  draw() {
-    this.dirty = false;
-    const { ctx, canvas, buf } = this;
-    const w = canvas.width, h = canvas.height;
-    const css = getComputedStyle(document.documentElement);
-    ctx.clearRect(0, 0, w, h);
-    ctx.strokeStyle = css.getPropertyValue('--hairline');
-    ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(0, h / 2); ctx.lineTo(w, h / 2); ctx.stroke();
-    if (buf.length < 2) return;
-    let peak = 1.5;
-    for (const s of buf) peak = Math.max(peak, Math.abs(s.ax), Math.abs(s.ay), Math.abs(s.az));
-    this.range += (peak * 1.1 - this.range) * 0.1;
-    const x = (i) => ((i + this.cap - buf.length) / (this.cap - 1)) * w;
-    const y = (v) => h / 2 - (v / this.range) * (h / 2 - 4);
-    const inks = [['ax', '--ink'], ['ay', '--ink-2'], ['az', '--muted']];
-    ctx.lineWidth = Math.max(1.5, w / 900);
-    ctx.lineJoin = 'round';
-    for (const [key, token] of inks) {
-      ctx.strokeStyle = css.getPropertyValue(token);
-      ctx.beginPath();
-      buf.forEach((s, i) => (i ? ctx.lineTo(x(i), y(s[key])) : ctx.moveTo(x(i), y(s[key]))));
-      ctx.stroke();
-    }
-  }
-}
-const trace = new Trace($('trace'));
+const trace = new Trace($('trace'), {
+  series: [['ax', '--ink'], ['ay', '--ink-2'], ['az', '--muted']],
+  seconds: TRACE_SECONDS,
+});
 
 // ---- 2 Prediction cards -----------------------------------------------------------------------
 function classColor(label) {
@@ -351,74 +303,21 @@ class Player {
 }
 
 // ---- Source: the wearable over Web Bluetooth -----------------------------------------------------
-class Wearable {
-  constructor() {
-    this.device = null;
-    this.wanted = false; // true while the user wants the link: drops are then reconnected
-    this._onImu = (ev) => {
-      try {
-        const { sessionId, samples } = P.decodeBatch(ev.target.value);
-        ingest(sessionId, samples);
-      } catch { /* a malformed packet is skipped */ }
-    };
-    this._onDrop = () => this.dropped();
-  }
-  get connected() { return Boolean(this.device && this.device.gatt && this.device.gatt.connected); }
-
-  async choose() {
-    if (!navigator.bluetooth) {
-      setSource(null, 'Bluetooth needs Edge or Chrome on http://localhost');
+const ble = new Wearable({
+  onSamples: ingest,
+  onState: (kind, text) => {
+    if (kind === 'ready') { player.stop(); resetCounters(); }
+    if (kind === 'disconnected') {
+      $('btn-connect').textContent = 'Connect wearable';
+      if (state.source === 'ble') setSource(null, text);
       return;
     }
-    const device = await navigator.bluetooth.requestDevice({
-      filters: [{ namePrefix: P.DEVICE_NAME_PREFIX }],
-      optionalServices: [P.SERVICE_UUID],
-    });
-    if (this.device) this.device.removeEventListener('gattserverdisconnected', this._onDrop);
-    this.device = device;
-    device.addEventListener('gattserverdisconnected', this._onDrop);
-    this.wanted = true;
-    player.stop();
-    await this.open();
-  }
-
-  async open() {
-    setSource('ble', `${this.device.name || 'Wearable'}: connecting`);
-    const server = await this.device.gatt.connect();
-    const service = await server.getPrimaryService(P.SERVICE_UUID);
-    const imu = await service.getCharacteristic(P.IMU_CHAR_UUID);
-    imu.removeEventListener('characteristicvaluechanged', this._onImu);
-    imu.addEventListener('characteristicvaluechanged', this._onImu);
-    resetCounters();
-    await imu.startNotifications();
-    setSource('ble', `${this.device.name || 'Wearable'} over Bluetooth`);
-    $('btn-connect').textContent = 'Disconnect wearable';
-  }
-
-  disconnect() {
-    this.wanted = false;
-    if (this.connected) this.device.gatt.disconnect();
-    $('btn-connect').textContent = 'Connect wearable';
-    if (state.source === 'ble') setSource(null, 'Wearable disconnected');
-  }
-
-  async dropped() {
-    if (!this.wanted) return;
-    for (let attempt = 1; attempt <= 10 && this.wanted; attempt++) {
-      setSource('ble', `${this.device.name || 'Wearable'}: link lost, reconnecting (${attempt})`);
-      try {
-        await this.open();
-        return;
-      } catch {
-        await new Promise((r) => setTimeout(r, 1000));
-      }
-    }
-    if (this.wanted) this.disconnect();
-  }
-}
+    if (kind === 'connected') $('btn-connect').textContent = 'Disconnect wearable';
+    setSource('ble', text);
+  },
+});
 
 const player = new Player();
-const ble = new Wearable();
 const server = new Server();
 
 $('btn-connect').addEventListener('click', async () => {

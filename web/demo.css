@@ -7,6 +7,7 @@
   --ink-2: #52514e;
   --muted: #898781;
   --hairline: #e1e0d9;
+  --band: #fbe3e3; /* the part of a trace that is being recorded */
   --critical: #d03b3b;
   /* exercise colours in class order (fixed; validated for colour-vision deficiency) */
   --c0: #2a78d6;

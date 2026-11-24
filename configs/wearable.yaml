@@ -15,3 +15,20 @@ unknown: [waving, torso_twists]
 shifted:
   curl_rotated90: "Two-arm Dumbbell Curl (both arms, not alternating)"
   curl_loose: "Two-arm Dumbbell Curl (both arms, not alternating)"
+
+# The recording page's checklist (web/record.html), in the order it is recorded. `sets` is how
+# many are needed, `seconds` the length of a fixed-length set. Fine-tuning needs two sets of
+# every known and background label: the last set of each is held out for validation.
+protocol:
+  - {label: curl, sets: 3, seconds: 35, hint: "two-arm dumbbell curl, both arms together"}
+  - {label: shoulder_press, sets: 3, seconds: 35, hint: "dumbbell shoulder press"}
+  - {label: lateral_raise, sets: 3, seconds: 35, hint: "dumbbell lateral raise"}
+  - {label: jumping_jacks, sets: 3, seconds: 35, hint: "jumping jacks"}
+  - {label: standing_still, sets: 2, seconds: 45, hint: "stand, arms at your sides"}
+  - {label: walking, sets: 2, seconds: 45, hint: "walk around the room"}
+  - {label: arm_circles, sets: 2, seconds: 30, hint: "large circles with straight arms"}
+  - {label: shadow_boxing, sets: 2, seconds: 30, hint: "punches in the air"}
+  - {label: waving, sets: 2, seconds: 30, hint: "wave with the kit arm (test only)"}
+  - {label: torso_twists, sets: 2, seconds: 30, hint: "twist the upper body left and right (test only)"}
+  - {label: curl_rotated90, sets: 1, seconds: 30, hint: "curl with the case turned 90 degrees on the wrist"}
+  - {label: curl_loose, sets: 1, seconds: 30, hint: "curl with a loose strap"}

@@ -8,8 +8,9 @@
 Open the address in Edge or Chrome, click "Connect wearable" and choose the kit; or "Upload a
 recording" and pick a ``raw.csv``. ``--replay`` plays a recorded session (a session folder or
 its ``raw.csv``) through the page as soon as it opens: for testing without a kit and as the
-fallback on stage if Bluetooth fails. ``/record.html`` is the recording console; with
-``--no-models`` the pages are served without trained models (a motion placeholder answers).
+fallback on stage if Bluetooth fails. ``/record.html`` is the recording page: it saves
+sessions straight into ``data/wearable/<subject>/<session>/``. With ``--no-models`` the pages
+are served without trained models (a motion placeholder answers).
 
 The cards on the page come from ``configs/demo.yaml`` (``--config``): one trained run directory
 per card, with the title shown to the audience and the uncertainty score to draw.
@@ -25,6 +26,7 @@ import uvicorn
 import yaml
 
 from uaar.live.predictors import RunPredictor
+from uaar.live.recorder import SessionRecorder
 from uaar.live.server import make_app
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -87,7 +89,8 @@ def main() -> int:
     for p in predictors or []:
         print(f"card {p.title!r}: {p.method.name}, score {p.score_name}, threshold {p.tau:.3f}")
     print(f"\nopen http://localhost:{args.port}/ in Edge or Chrome  (Ctrl-C to stop)\n", flush=True)
-    app = make_app(predictors, web_dir=ROOT / "web", replay=replay)
+    recorder = SessionRecorder(ROOT / "data" / "wearable", ROOT / "configs" / "wearable.yaml")
+    app = make_app(predictors, web_dir=ROOT / "web", replay=replay, recorder=recorder)
     uvicorn.run(app, host=args.host, port=args.port, log_level="warning")
     return 0
 
