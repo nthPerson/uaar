@@ -15,9 +15,18 @@ Test sets
 ``test_nonex``    test subjects, ``source == "multi"``, label in ``cfg.split.nonexercise_labels``
                   (``splits.select_nonexercise``; P1-b)
 
-Unknown-detection and open-set metrics for ``test_unknown`` and ``test_nonex`` are each computed
-against ``test_known`` of the same run, so ``test_known`` is always predicted (and returned) when
-either of them is requested.
+Background splits (``fold{k}_bg{seed}``) have two more, evaluated like the unknown sets:
+
+``test_background``  test subjects, the split's background classes: exercises whose windows a
+                     taught or Other-class model saw in training (from other subjects)
+``test_lookalike``   test subjects, the split's look-alike classes: variants of a known
+                     exercise, where being accepted is the reasonable outcome
+
+For a taught or Other-class model ``test_nonex`` is likewise a category seen in training, from
+new subjects; only ``test_unknown`` holds classes that no model saw in any form.
+
+Unknown-detection and open-set metrics for these sets are each computed against ``test_known``
+of the same run, so ``test_known`` is always predicted (and returned) when one is requested.
 
 ``metrics.json`` layout
 -----------------------
@@ -26,6 +35,7 @@ either of them is requested.
 
     {
       "run_id": str, "method": str, "dataset": str, "protocol": str,   # run_id, protocol (script)
+      "background": "none",           # cfg.background.mode the run was trained with (script)
       "split_id": "fold0_rand0", "seed": int,                         # seed (script)
       "K": int,                       # number of known classes
       "git_sha": str,                 # commit the run was trained at (script, from config.yaml)
@@ -49,7 +59,8 @@ either of them is requested.
           "<score>": {
             "mean",                                                 # mean score on this set
             "auroc", "aupr", "fpr95", "ratio", "n_known", "n_unknown",   # metrics.unknown_detection
-            "open_macro_f1", "unknown_recall", "known_accept_rate"      # metrics.open_set at tau
+            "open_macro_f1", "unknown_recall", "known_accept_rate",     # metrics.open_set at tau
+            "accepted"                # share of this set's windows with score <= tau
           }
         }
       }
@@ -57,7 +68,10 @@ either of them is requested.
 
 ``ratio`` is n_unknown / n_known (AUPR's chance level depends on it). ``known_accept_rate`` is the
 fraction of ``test_known`` windows with score <= tau; it should be close to ``accept_rate`` when
-the validation and test subjects behave alike.
+the validation and test subjects behave alike. ``accepted`` is the same fraction for the windows
+of an unknown set (1 - ``unknown_recall``): the share that would be shown as a known exercise.
+``fpr95`` differs from it only in where the threshold comes from (the test known windows
+instead of the validation ones).
 """
 
 from __future__ import annotations
@@ -74,14 +88,27 @@ from uaar.eval.preds import preds_frame, probs_matrix
 from uaar.models.base import Prediction
 
 KNOWN_SET = "test_known"
-UNKNOWN_SETS: tuple[str, ...] = ("test_unknown", "test_nonex")
+#: Sets only background splits have.
+BACKGROUND_SETS: tuple[str, ...] = ("test_background", "test_lookalike")
+UNKNOWN_SETS: tuple[str, ...] = ("test_unknown", "test_nonex", *BACKGROUND_SETS)
 SUPPORTED_SETS: tuple[str, ...] = (KNOWN_SET, *UNKNOWN_SETS)
+
+
+def default_sets(split: splits.Split) -> list[str]:
+    """The sets that exist for ``split``: the three P1 sets, plus ``test_background`` and
+    ``test_lookalike`` when the split lists such classes."""
+    sets = [KNOWN_SET, "test_unknown", "test_nonex"]
+    if split.background_classes:
+        sets.append("test_background")
+    if split.lookalike_classes:
+        sets.append("test_lookalike")
+    return sets
 
 
 # ---- Selecting and predicting ---------------------------------------------------------------
 def window_ids_for(meta: pd.DataFrame, split: splits.Split, set_name: str, cfg) -> np.ndarray:
     """``window_id`` values of one test set (see the module docstring for the definitions)."""
-    if set_name in ("test_known", "test_unknown"):
+    if set_name in ("test_known", "test_unknown", *BACKGROUND_SETS):
         return splits.select(meta, split, set_name)
     if set_name == "test_nonex":
         labels = list(cfg.get("split.nonexercise_labels", []) or [])
@@ -186,7 +213,10 @@ def _unknown_set_metrics(
     for name in score_names:
         sk = df_known[name].to_numpy(dtype=np.float64)
         su = df_unk[name].to_numpy(dtype=np.float64)
-        row = {"mean": float(su.mean()) if su.size else math.nan}
+        row = {
+            "mean": float(su.mean()) if su.size else math.nan,
+            "accepted": float(np.mean(su <= taus[name])) if su.size else math.nan,
+        }
         row |= metrics.unknown_detection(sk, su, accept)
         row |= {
             k: v

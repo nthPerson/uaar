@@ -1,0 +1,5 @@
+# Tier 2, taught: T dropout passes through the taught softmax network of the same cell.
+# Primary score: entropy (uaar.models.factory.primary_score); mutual information is reported too.
+protocol: k4taught
+method: mcdropout
+model: {mcdropout: {T: 30}}

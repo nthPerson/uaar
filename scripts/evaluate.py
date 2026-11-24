@@ -89,9 +89,10 @@ def main() -> int:
     ap.add_argument(
         "--sets",
         nargs="+",
-        default=list(runner.SUPPORTED_SETS),
+        default=None,
         choices=runner.SUPPORTED_SETS,
-        help="test sets to evaluate (test_known is added when an unknown set is requested)",
+        help="test sets to evaluate (default: every set the run's split has; test_known is "
+        "added when an unknown set is requested)",
     )
     ap.add_argument("--chunk-size", type=int, default=8192, help="windows per predict call")
     args = ap.parse_args()
@@ -113,8 +114,9 @@ def main() -> int:
     t0 = time.perf_counter()
     method = factory.load(run_dir)
     X, meta = registry.load_windows(cfg.dataset)
+    sets = args.sets or runner.default_sets(split)
     result, frames = runner.evaluate(
-        method, taus, X, meta, split, args.sets, cfg, chunk_size=args.chunk_size
+        method, taus, X, meta, split, sets, cfg, chunk_size=args.chunk_size
     )
     for name, df in frames.items():
         write_preds(df, run_dir, name)
@@ -125,6 +127,7 @@ def main() -> int:
         "method": result.pop("method"),
         "dataset": result.pop("dataset"),
         "protocol": cfg.get("protocol"),
+        "background": cfg.get("background.mode", "none") or "none",
         "split_id": result.pop("split_id"),
         "seed": seed,
         "K": result.pop("K"),
@@ -145,8 +148,8 @@ def main() -> int:
     for name in runner.UNKNOWN_SETS:
         for score, m in out.get(name, {}).get("scores", {}).items():
             print(
-                f"  {name:<12} {score:<14} AUROC {_fmt(m['auroc'])} "
-                f"FPR@95 {_fmt(m['fpr95'])} open-F1 {_fmt(m['open_macro_f1'])}"
+                f"  {name:<15} {score:<14} AUROC {_fmt(m['auroc'])} FPR@95 {_fmt(m['fpr95'])} "
+                f"accepted {_fmt(m.get('accepted'))} open-F1 {_fmt(m['open_macro_f1'])}"
             )
     return 0
 

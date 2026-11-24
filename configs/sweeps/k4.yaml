@@ -1,0 +1,10 @@
+# The four-exercise benchmark (decisions.md 2026-11-23): three tiers on every fold and every
+# background division, one seed. 5 folds x 3 divisions x 8 runs = 120 runs.
+#   uv run scripts/sweep.py configs/sweeps/k4.yaml
+folds: [0, 1, 2, 3, 4]
+class_splits: [bg0, bg1, bg2]
+seeds: [0]
+protocols:
+  k4plain: [softmax, mcdropout, edl, logreg]
+  k4taught: [softmax, mcdropout, edl]
+  k4other: [softmax]

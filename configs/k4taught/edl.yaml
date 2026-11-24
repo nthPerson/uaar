@@ -1,0 +1,5 @@
+# Tier 2, taught: background windows are trained towards zero evidence, KL(Dir(alpha) || Dir(1)).
+protocol: k4taught
+method: edl
+model: {edl: {evidence: softplus, loss: digamma, kl_anneal_epochs: 10}}
+background: {mode: uncertain, weight: 1.0}

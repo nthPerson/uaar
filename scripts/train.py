@@ -81,6 +81,25 @@ def main() -> int:
     if "groups" in inspect.signature(method.fit).parameters:
         # methods with an inner cross-validation (logreg) fold by training subject
         fit_kwargs["groups"] = meta["subject"].astype(str).to_numpy()[tr]
+    bg = cfg.get("background", {}) or {}
+    if (bg.get("mode") or "none") != "none":
+        # windows of the split's background classes and non-exercise windows, from the
+        # training and validation subjects, shown to the model as "none of the known classes"
+        if not split.background_classes:
+            sys.exit(f"background.mode={bg['mode']} needs a bg split; {split_id} has none")
+        nonex = list(cfg.get("split.nonexercise_labels", []) or [])
+        bg_seed = int(bg.get("seed", 0)) + args.seed
+        bg_tr = splits.select_background(
+            meta, split, "train", nonex, bg.get("n_exercise"), bg.get("n_nonex"), bg_seed
+        )
+        bg_va = splits.select_background(
+            meta, split, "val", nonex, bg.get("n_val_exercise"), bg.get("n_val_nonex"), bg_seed
+        )
+        fit_kwargs["background"] = (
+            X[window_positions(meta, bg_tr)],
+            X[window_positions(meta, bg_va)],
+        )
+        print(f"background ({bg['mode']}): train {len(bg_tr)} windows, val {len(bg_va)}")
     method.fit(X[tr], ytr, X[va], yva, cfg, run_dir, **fit_kwargs)
     train_s = time.perf_counter() - t0
     method.save(run_dir)

@@ -1,0 +1,4 @@
+# Tier 1, plain: the four known exercises only; nothing else is seen in training.
+protocol: k4plain
+method: edl
+model: {edl: {evidence: softplus, loss: digamma, kl_anneal_epochs: 10}}

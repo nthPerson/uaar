@@ -1,0 +1,4 @@
+# Tier 3, reference: the background windows are a fifth class, "Other".
+protocol: k4other
+method: softmax
+background: {mode: other}

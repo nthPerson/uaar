@@ -8,3 +8,8 @@ split: {n_folds: 5, val_frac: 0.15, frac_unknown: 0.25, min_subjects: 25, min_mi
 train: {epochs: 60, batch_size: 256, lr: 1.0e-3, weight_decay: 1.0e-4, patience: 8, class_weighting: inv_sqrt, num_workers: 0}
 model: {dropout: 0.3}
 eval: {accept_rate: 0.95}
+# Background windows in training (bg splits only; docs/methods.md). mode: none = plain model,
+# uncertain = "taught" (uniform target / zero evidence on background windows), other = an
+# explicit "Other" class. The n_* values cap the windows drawn per run (exercise windows of
+# the split's background classes, and non-exercise windows) for training and validation.
+background: {mode: none, weight: 0.5, n_exercise: 8000, n_nonex: 4000, n_val_exercise: 1200, n_val_nonex: 600, seed: 0}

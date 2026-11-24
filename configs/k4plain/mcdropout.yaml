@@ -1,0 +1,4 @@
+# Tier 1, plain. MC Dropout does not train: evaluate.py --method mcdropout --from <softmax run>
+protocol: k4plain
+method: mcdropout
+model: {mcdropout: {T: 30}}

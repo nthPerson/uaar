@@ -1,0 +1,4 @@
+# Tier 2, taught: background windows get a uniform target, weight 0.5 (no extra class).
+protocol: k4taught
+method: softmax
+background: {mode: uncertain, weight: 0.5}

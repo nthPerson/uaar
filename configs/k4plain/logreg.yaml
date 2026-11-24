@@ -1,0 +1,4 @@
+# Tier 1, plain: the four known exercises only; nothing else is seen in training.
+protocol: k4plain
+method: logreg
+model: {logreg: {C_grid: [0.01, 0.1, 1.0, 10.0], inner_folds: 3}}

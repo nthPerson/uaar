@@ -126,9 +126,10 @@ def test_evaluate_writes_preds_and_metrics(evaluated):
         row = m[s]["scores"]["msp"]
         assert set(row) == {
             "mean", "auroc", "aupr", "fpr95", "ratio", "n_known", "n_unknown",
-            "open_macro_f1", "unknown_recall", "known_accept_rate",
+            "open_macro_f1", "unknown_recall", "known_accept_rate", "accepted",
         }  # fmt: skip
         assert 0.0 <= row["auroc"] <= 1.0 and row["n_known"] == len(known)
+        assert row["accepted"] == pytest.approx(1.0 - row["unknown_recall"])
     assert 0.0 <= k["closed_set"]["accuracy"] <= 1.0
 
 
