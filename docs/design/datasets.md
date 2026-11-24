@@ -11,6 +11,8 @@ Three public wrist/forearm IMU datasets plus a small recording session with our 
 | **RecGym** | 10 (5 sessions each) | 11 workouts + Null | Wrist, pocket, calf (use wrist) | 20 Hz | min-max normalized [0, 1] | Second open-set benchmark (stretch 2) | CC BY 4.0 |
 | **Our wearable** | 2+ | Chosen from known set + new movements | XIAO ESP32-S3 + BMI160, left wrist | 50 Hz | raw LSB → g, °/s | Real-device test (stretch 3) | ours |
 
+**Status 2026-11-23:** MM-Fit and RecGym are not used (dropped with stretch goals 1 and 2, `../decisions.md`); their sections below are kept as background. RecoFit and our own recordings are the two datasets of the project.
+
 ## 1. RecoFit (primary)
 
 - **Source:** https://github.com/microsoft/Exercise-Recognition-from-Wearable-Sensors (archived, read-only). Paper: Morris, Saponas, Guillory & Kelner, *RecoFit*, CHI 2014, https://doi.org/10.1145/2556288.2557116.

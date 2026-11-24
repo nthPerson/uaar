@@ -34,6 +34,21 @@ The open-set decision is ŷ = f(x) if s(x) ≤ τ, otherwise "unknown," with τ 
 
 P1 runs over 5 subject folds × (3 random + 1 near-unknown) class splits × up to 3 seeds.
 
+**Status 2026-11-23** (`../decisions.md`). P1 was run on fold 0 only (28 known classes, four
+class splits, one seed) and is kept as the "hard case". The headline benchmark is now **K4**:
+four known exercises, on 5 subject folds × 3 background divisions (`bg0`–`bg2`) × 1 seed, in
+three tiers that differ only in what the model sees in training:
+
+| ID | Tier | Train | Test (known) | Test (unknown) |
+|---|---|---|---|---|
+| `k4plain` | plain | the four known classes, training subjects | known classes, test subjects | 16 held-out exercises; non-exercise; background classes; look-alikes (all test subjects) |
+| `k4taught` | taught | the same plus background windows with an "be uncertain" target | same | same |
+| `k4other` | Other class (reference) | the same background windows as a fifth class | same | same |
+
+The headline number is the share of unknown windows accepted at τ (§3), next to AUROC and
+FPR@95. P2 (MM-Fit) and P3 (RecGym) are dropped; P4 (our wearable) uses the K4 models.
+Results and wording for the report: `../methods.md`, "Background windows in training".
+
 ## 3. Threshold selection
 
 For each method and score, τ is the value at which **95 % of the validation subjects' known-class windows are accepted**. This uses known data only, which is what a deployed system could do. The same τ is used in P2–P4 without re-tuning, which is itself part of the shift test.

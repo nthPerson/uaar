@@ -74,6 +74,7 @@ Sensoy, Kaplan & Kandemir (2018): the network outputs non-negative **evidence** 
   - annealing λ_t = min(1, epoch / 10).
 - **Ablations:** the log-likelihood (digamma) variant of the loss; annealing length; interaction with class weights.
 - **Status 2026-11-05:** the squared-error loss did not train on the 28 known classes, so the digamma variant is the default and the squared-error loss is the ablation (`docs/decisions.md`).
+- **Status 2026-11-23, background windows:** M2 and M3 can be trained with windows that belong to no known class (`background.mode: uncertain`): M2 adds the cross-entropy to the uniform distribution on them (outlier exposure, Hendrycks et al. 2019), M3 adds KL(Dir(α) ‖ Dir(1)) on them. M4 then runs on the taught M2 network, with entropy as its score, because mutual information fails there. `background.mode: other` gives M2 an explicit "Other" class as a reference. M1 has no such version. See `docs/methods.md`, "Background windows in training".
 - **Known failure modes:** evidence collapse early in training; over-regularization from the KL term, which lowers known-class accuracy; sensitivity to class imbalance. Watch known-class macro-F1 against M2 on the validation subjects.
 - **Link to Robert's research:** Robert already works with EDL (vacuity-based uncertainty in a perception proof of concept); this project applies it to wearable time series.
 

@@ -254,6 +254,42 @@ subject folds left some exercises with 1–2 validation subjects (24 of 38 class
 We stratify the subject folds by exercise: every class now has ≥ 3 validation and ≥ 5 test
 subjects in every fold. Subjects never cross between train and test."
 
+### Background splits `bg0`–`bg2` (decided 2026-11-23)
+
+The four-exercise benchmark (`methods.md`, "Background windows in training") uses its own class
+splits, written next to the `rand`/`near` files by
+`uv run scripts/prepare_data.py recofit --steps background_splits` from
+`configs/known4_recofit.yaml`. The subject folds are the same five stratified folds.
+
+| List in the split file | Classes | Role |
+|---|---|---|
+| `known_classes` (4) | `Two-arm Dumbbell Curl (both arms, not alternating)`, `Shoulder Press (dumbbell)`, `Lateral Raise`, `Jumping Jacks` | the only classes a model is asked to recognize |
+| `lookalike_classes` (2) | `Bicep Curl`, `Squat Rack Shoulder Press` | variants of a known exercise: never trained on, not counted as unknown, tested as their own set |
+| `background_classes` (16) | half of the other 32 eligible classes, drawn per seed | windows a taught or Other-class model may be shown in training |
+| `unknown_classes` (16) | the other half | test only; no model sees them in any form |
+
+Classes tied in `configs/near_unknown_recofit.yaml` (its twin-label groups and its look-alike
+pairs, for example `Squat` / `Squat (arms in front ...)` / `Dumbbell Squat`, `Pushups` /
+`Pushup (...)`, the two side planks, the two static stretches) stay on one side, so a held-out
+class never has a twin among the background classes. The held-out classes per division:
+
+- `bg0`: Crunch, Dip, Dumbbell Deadlift Row, Dumbbell Row, Dynamic Stretch, Jump Rope, Lunge,
+  Overhead Triceps Extension, Sit-up, Sit-ups, both Static Stretch labels, Triceps Kickback,
+  V-up, Walking lunge, Wall Squat.
+- `bg1`: Butterfly Sit-up, Crunch, Fast Alternating Punches, Lunge, Overhead Triceps
+  Extension, Plank, Russian Twist, Seated Back Fly, both Side Planks, both Static Stretch
+  labels, Triceps Kickback, V-up, Walking lunge, Wall Squat.
+- `bg2`: Crunch, Dynamic Stretch, Fast Alternating Punches, Overhead Triceps Extension, Plank,
+  Power Boat pose, Pushup, Pushups, Seated Back Fly, Sit-up, Sit-ups, Squat Jump, both Static
+  Stretch labels, V-up, Wall Squat.
+
+Windows per part (range over the 15 files): train known 3,751–3,878; validation known 607–691;
+test known 1,062–1,191; test unknown (held-out exercises) 8,106–10,892; test background
+4,763–6,829; test look-alike 635–803; non-exercise test 19,722–26,341. Every known class has at
+least 3 validation and 5 test subjects in every fold. The background training pool has
+17,417–22,117 exercise windows and 75,324–81,641 non-exercise windows per fold; each run draws
+8,000 and 4,000 of them (1,200 and 600 for validation; `background.*` in `configs/base.yaml`).
+
 ## Our wearable
 
 See [wearable-recording.md](wearable-recording.md) for the sessions. The `wearable` dataset is

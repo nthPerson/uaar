@@ -160,3 +160,75 @@ schedule, best vacuity, poor ECE) and report the KL weight as an ablation, or ad
 Code: `kl_weight` and `loss: log` were added to `uaar.models.edl` for these runs. The runs made
 with the squared-error loss are kept in `reports/runs/edl-mse-fold0/` and are not used.
 
+## 2026-11-23
+
+Decided by Robert in a session with the AI assistant, after the fold-0 results of Nov 5 were
+reviewed (86 to 91 % of unknown windows accepted by every method on the 28-class benchmark).
+Write-up for the report and slides: `methods.md`, "Background windows in training".
+
+**The benchmark is cut to four known exercises.** `Two-arm Dumbbell Curl (both arms, not
+alternating)`, `Shoulder Press (dumbbell)`, `Lateral Raise` and `Jumping Jacks`: the exercises
+of the demo, chosen because the wrist moves in all of them (the squat of the Nov 5 list barely
+moves the wrist and was dropped). *Why:* the project only needs to be a small example, the
+presentation (Dec 3) is 6 to 7 minutes long, and with 28 similar classes the models are unsure
+about so many known windows that the 95 % threshold accepts almost everything. The 28-class
+runs of fold 0 are kept as the hard case and are not extended to the other folds.
+
+**Variants of a known exercise are not unknowns.** `Bicep Curl` and `Squat Rack Shoulder
+Press` are left out of training and out of the unknown test set (`lookalike_classes`); they
+are evaluated as their own set, where every model accepts about 90 % of their windows.
+
+**Three tiers** (`background.mode`; protocols `k4plain`, `k4taught`, `k4other`). (1) *Plain*:
+the four methods trained on the four exercises only; this is the problem statement. (2)
+*Taught*: softmax with a uniform-target term (weight 0.5) and EDL with KL(Dir(α) ‖ Dir(1))
+(weight 1) on background windows, MC Dropout on the taught softmax network; this is the main
+result and the demo. (3) *Other class*: softmax with the background windows as a fifth class,
+one reference row. Logistic regression stays plain. *Why taught and not only an Other class:*
+with an Other class the rejection is ordinary classification and every method does the same
+thing; in the taught models the uncertainty score still makes the decision, so the methods'
+scores can be compared, which is the subject of the project. The Other class is reported so
+that the comparison is on the table.
+
+**Background and held-out classes** (`configs/known4_recofit.yaml`, split files
+`fold{k}_bg{0,1,2}.json`). The 32 other eligible classes are divided at random, three times,
+into 16 background classes (windows a model may see in training) and 16 held-out classes (the
+unknown test set). Twin labels and the look-alike pairs of `configs/near_unknown_recofit.yaml`
+stay on one side. *Why this was added by the assistant:* in the first trial run the division
+ignored the twins, so `Pushups` could be background while `Pushup (knee or foot variation)` was
+"unknown", and a "never-seen" exercise could have been seen under its other label. The
+division now rules that out (the effect on the numbers was not measured separately). Background training data per
+run: 8,000 exercise windows and 4,000 non-exercise windows of the training subjects.
+
+**Results** (5 folds × 3 divisions × 1 seed, 15 runs per row; share of unknown exercise windows
+accepted at τ). Plain: logistic regression 59.9 %, softmax 64.7 %, MC Dropout (mutual
+information) 77.4 %, EDL 63.0 %. Taught: softmax 6.3 %, MC Dropout (entropy) 6.1 %, EDL 5.2 %.
+Other class: 5.1 %. Known accuracy is 0.96 in every tier. The taught models and the Other
+class are level; the fold-0 trial that suggested this (7 %, 4 %, 3 %) was confirmed on all
+folds only after the checkpoint criterion below was fixed.
+
+**Taught models are selected on open-set validation macro-F1** (assistant's change, for Robert
+to confirm). The first full sweep kept the usual criterion, macro-F1 on the known validation
+windows. That is 1.0 from the first epochs of a four-class problem, so early stopping kept
+checkpoints from before the background term had been learned: 12.9 ± 11.4 % (softmax) and
+17.0 ± 16.3 % (EDL) of unknown windows accepted, 68 % in the worst run (best epoch 0). The
+criterion now is macro-F1 over the four classes plus "rejected" on the known and background
+validation windows, with the threshold at the 95 % quantile of the known validation scores
+(`uaar.models.base.open_macro_f1`), which mirrors how the Other-class model is selected. It
+uses validation data only and was fixed before the re-run, but the change was prompted by
+test results; the report should say so. The first runs are in
+`reports/runs/k4taught-f1-selection/`.
+
+**MC Dropout's primary score is entropy for taught networks**
+(`uaar.models.factory.primary_score`). Mutual information accepts 97 % of unknown windows
+there (AUROC 0.34): the taught network is flat in every dropout pass, so the passes agree.
+For plain networks the primary score stays mutual information.
+
+**MM-Fit and RecGym are dropped** (stretch goals 1 and 2; neither loader was started).
+Robert asked for confirmation that the course does not require more than one dataset; the
+requirement map in `design/README.md` §7 lists one public dataset, and the original
+instruction document is not on this machine, so that check is Robert's.
+
+**Not decided here:** the EDL KL weight (still 1, the open question of Nov 5); whether the
+report's headline uses the share accepted at τ or FPR@95 (they differ most in fold 4, where τ
+from the validation subjects rejects about 10 % of the test subjects' known windows).
+

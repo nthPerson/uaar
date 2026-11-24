@@ -50,6 +50,8 @@ A wrist-worn exercise recognizer is trained on a fixed list of exercises. In use
 
 **Out of scope:** on-device (microcontroller) inference, rep counting, form feedback, and anything camera-based. Those belong to the BDA 696 project.
 
+**Status 2026-11-23** (decided by Robert, [`../decisions.md`](../decisions.md)): minimum goals 1 and 2 are delivered on a four-exercise version of the benchmark (curl, shoulder press, lateral raise, jumping jacks known; 16 held-out exercises unknown), in three tiers: plain models, models taught to be uncertain on background windows, and an "Other"-class reference. The 28-class benchmark was run on one fold and is kept as the hard case. Stretch goals 1 and 2 (MM-Fit, RecGym) are dropped; stretch goal 3 (our wearable) is the live demo. Minimum goal 3 is to be met by extending the live page instead of a separate Streamlit app.
+
 ## 4. Relationship to the BDA 696 project (FormCoach)
 
 Robert is also on a BDA 696 team building **FormCoach**, a wrist wearable (XIAO ESP32-S3 + BMI160) that decides when to wake a webcam pose pipeline and gives rule-based form feedback. The CompE 510 syllabus lists "submitting a piece of work you did for one class to another class" as plagiarism, so the boundary is explicit:

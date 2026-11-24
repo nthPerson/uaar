@@ -8,7 +8,7 @@ recognizer say "I don't know" (logistic regression, a softmax network, evidentia
 learning and Monte Carlo dropout) on public IMU datasets, then runs the result live on our own
 wearable (XIAO ESP32-S3 + BMI160).
 
-Status (2026-11-04): firmware v0.1.0 flashed and verified on kit K1; serial recorder, browser page and live backend working with a placeholder predictor; RecoFit pipeline run on the real data; all four methods and the evaluation scripts implemented and tested, with two-epoch smoke runs only; the class-eligibility decision and the full fold-0 runs are next.
+Status (2026-11-23): the benchmark is four known exercises (curl, shoulder press, lateral raise, jumping jacks) against 16 held-out exercises and non-exercise movement, on RecoFit, in three tiers: plain models, models taught to be uncertain on background windows, and an "Other"-class reference. All tiers are run on five subject folds and three background divisions (120 runs; results in [docs/methods.md](docs/methods.md), "Background windows in training"). The earlier 28-class benchmark was run on fold 0 only and is kept as the hard case. Firmware v0.1.0 runs on kit K1; the second kit, the recording session with both team members, statistics and the report are still to do. Earlier status (2026-11-04): firmware v0.1.0 flashed and verified on kit K1; serial recorder, browser page and live backend working with a placeholder predictor; RecoFit pipeline run on the real data; all four methods and the evaluation scripts implemented and tested, with two-epoch smoke runs only; the class-eligibility decision and the full fold-0 runs are next.
 
 ## Layout
 
@@ -39,6 +39,11 @@ uv run scripts/train.py --config configs/p1/edl.yaml --fold 0 --class-split rand
 uv run scripts/evaluate.py reports/runs/p1_recofit_edl_fold0_rand0_seed0
 uv run scripts/evaluate.py --method mcdropout --from reports/runs/p1_recofit_softmax_fold0_rand0_seed0
 uv run scripts/make_tables.py
+
+# the four-exercise benchmark: splits, all three tiers on every fold (120 runs), tables
+uv run scripts/prepare_data.py recofit --steps background_splits
+uv run scripts/sweep.py configs/sweeps/k4.yaml
+uv run scripts/make_tables.py          # reports/tables/scores_by_protocol.md
 
 # wearable
 firmware/tools/attach-xiao.sh                                   # WSL: hand the USB port to Linux

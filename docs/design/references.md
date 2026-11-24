@@ -17,6 +17,7 @@
 ## Experimental method
 
 - Sechidis, K., Tsoumakas, G., & Vlahavas, I. (2011). *On the Stratification of Multi-Label Data.* ECML PKDD, LNCS 6913, 145–158. https://doi.org/10.1007/978-3-642-23808-6_10 (iterative stratification, used for the subject folds; implemented from the paper's description in `uaar.data.splits`)
+- Hendrycks, D., Mazeika, M., & Dietterich, T. (2019). *Deep Anomaly Detection with Outlier Exposure.* ICLR. https://arxiv.org/abs/1812.04606 (training a classifier to be uncertain on auxiliary outlier data; the basis of the "taught" softmax model, `methods.md`. Title, authors and venue checked against the arXiv record on 2026-11-23; the loss was implemented from the description, not from the authors' code)
 
 ## Uncertainty and open-set recognition for activity recognition
 

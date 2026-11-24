@@ -378,6 +378,8 @@ Small fixes (typos, config values) can be merged by the author with a note.
 
 ## 10. Schedule
 
+**Status 2026-11-23.** No commits were made between Nov 5 and Nov 23, so the W5 and W6 rows below did not run as dated. Decided on Nov 23 (`../decisions.md`): the benchmark is cut to four known exercises in three tiers (plain, taught, Other class; item 6.1 is replaced by `configs/sweeps/k4.yaml`, 120 runs, done Nov 23); MM-Fit and RecGym (6.3 P2, 7.4) are dropped; the course app (6.4) is the extended live page, not Streamlit; the presentation is on Dec 3 and is 6–7 minutes long. Still open from the rows below: 4.7 and 5.5 (second kit, recording session), 6.2 (fine-tuning), 6.5 (demo rehearsal), `stats.py`, 7.1–7.3 and W8.
+
 Revised 2026-11-03. The original W0–W3 plan (Oct 8 – Nov 1) did not run: the wearable hardware came first. Dates below run from Nov 3 to the Dec 8 submission; course dates are unchanged ([README.md §5](README.md#5-plan)). R = Robert, S = Sirena, B = both. The live demo (D8) and fine-tuning (D4) decided on Nov 3 are folded in; the original item numbers are not reused.
 
 **Critical path:** RecoFit pipeline → fold-0 runs of all four methods → wearable recordings → fine-tuning → live demo rehearsal. Everything on the wearable side (firmware, recorder, browser page) runs in parallel with the pipeline and never blocks it.
