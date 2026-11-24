@@ -232,3 +232,40 @@ instruction document is not on this machine, so that check is Robert's.
 report's headline uses the share accepted at τ or FPR@95 (they differ most in fold 4, where τ
 from the validation subjects rejects about 10 % of the test subjects' known windows).
 
+**The course app is the live page, not a separate Streamlit app** (Robert, 2026-11-23). The
+requirement "upload data, show prediction, explain output" is met by `web/index.html`, served
+with the predictions by one command (`scripts/demo.py`): upload is the live Bluetooth stream of
+the kit or a recorded `raw.csv`; prediction is one card per model; the presenters explain the
+output, and each card names the model's uncertainty measure in plain words. Cards: the plain
+softmax network, taught MC Dropout (predictive entropy) and taught EDL (vacuity). The bars
+share a 0–100 % scale (each score divided by its largest possible value), so they are
+comparable in direction; each model's limit comes from its own validation data. `--replay`
+plays a recording on load (testing, and the fallback on stage). The earlier console is
+`/record.html`. `scripts/serve_web.py` and `scripts/live_server.py` are removed.
+
+**Final models are tracked in git** (Robert, 2026-11-23): `models/`, filled by
+`scripts/export_model.py` and `scripts/finetune.py`, so the page runs from a fresh clone. It
+holds the eight fold-0 `bg0` four-exercise models and will hold the fine-tuned ones; the other
+cross-validation runs stay in `reports/runs/` (not in git).
+
+**Fine-tuning recipe for our own recordings** (Robert approved the outline, 2026-11-23;
+`uaar.models.finetune`, `scripts/finetune.py`). Start from a RecoFit four-exercise model;
+freeze the convolutional trunk; re-fit the input normalization on the training person's
+windows; train the two output layers on their known sets; a taught model keeps its
+"be uncertain" term on their background movements (`standing_still`, `walking`,
+`arm_circles`, `shadow_boxing`); the last set of every label is validation, for early stopping
+and a new threshold; test on the other person, both directions. `waving` and `torso_twists`
+are never trained on and are the unknown test. Label roles: `configs/wearable.yaml`.
+*EDL differs (assistant's change, for Robert to review):* on the fold-0 taught EDL model the
+outputs before the softplus are near −8.5 for anything unfamiliar, where the softplus slope is
+about 0.0002, so the last layer hardly moves and fine-tuning stayed at "no evidence for
+anything". The EDL fine-tune therefore re-initializes the last layer and repeats the KL ramp of
+the first training. *Status:* tested only on synthetic sessions (sinusoids per label), where
+softmax and EDL both reached 1.0 known accuracy on the second "person"; nothing is known yet
+about real wrist data. `--full` also trains the trunk, as a fallback.
+
+**Bluetooth sample loss is not understood yet.** A browser session on 2026-11-23 lost 110 of
+about 2,600 samples (4 %) while the kit was worn and moved; a 90 s comparison of the Bluetooth
+and USB streams with the kit lying still lost none of 4,414. The firmware does not check
+whether a notification was accepted. The recording tools must show loss per set.
+

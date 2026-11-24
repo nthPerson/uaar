@@ -49,10 +49,13 @@ uv run scripts/make_tables.py          # reports/tables/scores_by_protocol.md
 firmware/tools/attach-xiao.sh                                   # WSL: hand the USB port to Linux
 uv tool run platformio run -d firmware -t upload --upload-port /dev/ttyACM0
 uv run scripts/record_wearable.py --port /dev/ttyACM0 --subject W01
-uv run scripts/serve_web.py          # browser page on http://localhost:8000 (Chrome/Edge, Web Bluetooth)
-uv run scripts/live_server.py        # live-demo backend on ws://localhost:8765/ws
-uv run scripts/live_server.py --runs reports/runs/<run_id> ...   # one card per trained run
-uv run scripts/live_replay.py data/wearable/W01/<session>        # replay a recording (stage fallback)
+
+# live demo and recording pages (Edge or Chrome; the models are in models/, tracked in git)
+uv run scripts/demo.py               # http://localhost:8000 : upload a stream, see each model's answer
+uv run scripts/demo.py --replay data/wearable/W01/<session>      # play a recording (stage fallback)
+uv run scripts/demo.py --no-models   # pages only; /record.html is the recording console
+uv run scripts/finetune.py --run models/<run> --train data/wearable/W01 --test data/wearable/W02
+uv run scripts/export_model.py reports/runs/<run_id>             # final copy of a model into models/
 ```
 
 Documentation: [docs/design/](docs/design/) (what and why), [docs/decisions.md](docs/decisions.md) (what changed and when), [docs/wearable-recording.md](docs/wearable-recording.md) (devices, protocol, session log), [firmware/README.md](firmware/README.md), [web/README.md](web/README.md), [docs/ai-use-log.md](docs/ai-use-log.md).

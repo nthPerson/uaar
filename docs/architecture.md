@@ -26,8 +26,10 @@ flowchart LR
 |---|---|---|
 | `firmware/` | XIAO ESP32-S3 + BMI160 streamer (50 Hz, serial CSV + BLE, button sessions) | Robert |
 | `uaar.data.wearable`, `scripts/record_wearable.py` | wire protocol mirror, session parsing, serial recorder | Robert |
-| `web/` | Web Bluetooth page: live charts, recording, prediction cards | Robert |
-| `uaar.live` , `scripts/live_server.py` | sliding windows + per-method predictions over WebSocket | Robert |
+| `web/` | demo page (`/`: upload a stream, one card per model) and recording console (`/record.html`), Web Bluetooth | Robert |
+| `uaar.live`, `scripts/demo.py` | one server for the pages and the predictions: sliding windows + per-model answers over WebSocket | Robert |
+| `uaar.data.wearable_windows`, `uaar.models.finetune`, `scripts/finetune.py` | our recordings as labelled windows; fine-tuning a RecoFit model on them | Robert |
+| `models/`, `scripts/export_model.py` | final models, tracked in git | both |
 | `uaar.data.recofit` / `mmfit` / `recgym` | dataset loaders to the recordings contract | Robert (RecGym: Sirena) |
 | `uaar.data.windows`, `splits`, `registry` | windowing, subject folds and class splits, data layout | Robert |
 | `uaar.features.handcrafted` | ~90 features per window for M1 | Sirena |
@@ -35,7 +37,7 @@ flowchart LR
 | `uaar.models.logreg`, `mcdropout` | M1, M4 | Sirena (M1 reviewed by Robert) |
 | `uaar.eval.*` | metrics, calibration, threshold, cost, stats, plots | Sirena (cost, stats: Robert) |
 | `uaar.app` | Streamlit upload app | Sirena |
-| `scripts/` | prepare_data, train, evaluate, sweep, make_tables, export_app_assets, record_wearable, serve_web, live_server | per module above |
+| `scripts/` | prepare_data, train, evaluate, sweep, make_tables, export_app_assets, record_wearable, demo, finetune, export_model, live_replay | per module above |
 
 ## Live demo path
 
@@ -43,11 +45,14 @@ flowchart LR
 2. The page decodes them, charts the last 10 s, and forwards the raw rows to the backend.
 3. The backend keeps a 2 s buffer, emits a window every second, runs every loaded method on it,
    and returns label, probability, uncertainty score and the unknown decision per method.
-4. The page shows one card per method side by side and a timeline of the last 30 windows.
-5. The page can ask the kit to flash its LED for known/unknown (control characteristic).
+4. The page shows one card per model side by side: its answer, its uncertainty on a 0–100 % bar
+   against its limit, and a strip of the last 30 windows.
 
-The backend loads trained run directories (`scripts/live_server.py --runs <run_dir> ...`, one
-card per run through `uaar.live.predictors.RunPredictor`, each with its primary score and the τ
-from its `threshold.json`); without `--runs` it serves a motion-energy placeholder.
+The page can also upload a recorded `raw.csv` instead of the live stream; both go through the
+same path.
+
+The backend loads the model folders listed in `configs/demo.yaml` (one card each through
+`uaar.live.predictors.RunPredictor`, with the score to show and the τ from the model's
+`threshold.json`); with `--no-models` it serves a motion-energy placeholder.
 
 Fallback on stage: `scripts/live_replay.py` streams a recorded session into the same backend.
