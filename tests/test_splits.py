@@ -150,8 +150,11 @@ def test_write_splits_files_and_schema(written):
         "eligibility",
         "class_source",
         "fold_strategy",
+        "background_classes",
+        "lookalike_classes",
         "created_by",
     ]
+    assert d["background_classes"] == [] and d["lookalike_classes"] == []
     assert d["dataset"] == "recofit"
     assert d["eligibility"] == {"min_subjects": 20, "min_minutes": 5.0}
     assert isinstance(d["created_by"], str) and d["created_by"]
@@ -409,3 +412,105 @@ def test_write_splits_records_fold_strategy(tmp_path):
     assert a.fold_strategy == "random" and b.fold_strategy == "class_stratified"
     assert a.known_classes == b.known_classes  # the class split does not depend on the folds
     assert a.test_subjects != b.test_subjects
+
+
+# ---- Background splits (a few known classes, background and held-out unknown) -----------------
+def _many_class_meta() -> pd.DataFrame:
+    """Twelve classes, every subject does all of them, plus non-exercise in "multi"."""
+    rows = []
+    for i in range(30):
+        for k in range(12):
+            rows += [(f"{i:02d}", "single", f"ex{k:02d}")] * 2
+        rows += [(f"{i:02d}", "multi", "Rest")] * 3
+    meta = pd.DataFrame(rows, columns=["subject", "source", "label"])
+    meta.insert(0, "window_id", np.arange(len(meta)))
+    return meta
+
+
+BG_KW = dict(
+    known=["ex00", "ex01"],
+    lookalike=["ex02"],
+    tied=[["ex03", "ex04"], ["ex04", "ex05"], ["ex00", "ex06"]],
+    min_subjects=20,
+    min_minutes=0.0,
+    exclude=["Rest"],
+    class_source="single",
+    stratify_folds=True,
+)
+
+
+def test_make_background_split_is_disjoint_and_keeps_tied_groups_together():
+    classes = [f"ex{k:02d}" for k in range(12)]
+    seen = set()
+    for seed in range(12):
+        bg, held = sp.make_background_split(
+            classes, BG_KW["known"], BG_KW["lookalike"], 0.5, seed, BG_KW["tied"]
+        )
+        assert not set(bg) & set(held)
+        assert sorted(bg + held) == classes[3:]  # known and look-alike are in neither list
+        assert bg and held and abs(len(bg) - len(held)) <= 3
+        # overlapping groups are merged: ex03, ex04 and ex05 stay on one side
+        assert len({c in bg for c in ("ex03", "ex04", "ex05")}) == 1
+        seen.add(tuple(bg))
+    assert len(seen) > 1  # the seed changes the division
+    with pytest.raises(ValueError, match="not eligible"):
+        sp.make_background_split(classes, ["nope"])
+
+
+def test_write_background_splits_files_and_selection(tmp_path):
+    meta = _many_class_meta()
+    paths = sp.write_background_splits(meta, tmp_path / "x" / "splits", seeds=(0, 1), **BG_KW)
+    assert sorted(p.name for p in paths) == sorted(
+        f"fold{k}_bg{s}.json" for k in range(5) for s in (0, 1)
+    )
+    for path in paths:
+        split = sp.load_split(path)
+        assert split.known_classes == ["ex00", "ex01"] and split.lookalike_classes == ["ex02"]
+        groups = [
+            split.known_classes,
+            split.unknown_classes,
+            split.background_classes,
+            split.lookalike_classes,
+        ]
+        flat = [c for g in groups for c in g]
+        assert len(flat) == len(set(flat)) == 12
+        tr, va, te = (
+            set(split.train_subjects),
+            set(split.val_subjects),
+            set(split.test_subjects),
+        )
+        assert not (tr & va or tr & te or va & te)
+        ids = {part: sp.select(meta, split, part) for part in sp.ALL_PARTS}
+        by_id = meta.set_index("window_id")
+        for part, w in ids.items():
+            assert len(w), part
+            rows = by_id.loc[w]
+            assert (rows["source"] == "single").all()
+            assert set(rows["subject"]) <= {"train": tr, "val": va, "test": te}[part.split("_")[0]]
+        assert set(by_id.loc[ids["train_background"], "label"]) == set(split.background_classes)
+        assert set(by_id.loc[ids["test_unknown"], "label"]) == set(split.unknown_classes)
+        assert set(by_id.loc[ids["test_lookalike"], "label"]) == {"ex02"}
+        # nothing a model may be trained on comes from a held-out class, a look-alike or a
+        # test subject
+        trainable = np.concatenate(
+            [ids["train"], ids["val"], ids["train_background"], ids["val_background"]]
+        )
+        rows = by_id.loc[trainable]
+        assert not set(rows["label"]) & set(split.unknown_classes + split.lookalike_classes)
+        assert not set(rows["subject"]) & te
+        for part, subjects in (("train", tr), ("val", va), ("test", te)):
+            nonex = by_id.loc[sp.select_nonexercise(meta, split, ["Rest"], part)]
+            assert len(nonex) and set(nonex["subject"]) <= subjects
+            assert (nonex["source"] == "multi").all()
+    # same folds as the rand/near files written with the same arguments
+    kw = {k: v for k, v in BG_KW.items() if k not in ("known", "lookalike", "tied")}
+    other = sp.load_split(sp.write_splits(meta, tmp_path / "y" / "splits", **kw)[0])
+    first = sp.load_split(paths[0])
+    assert other.fold == first.fold == 0 and other.test_subjects == first.test_subjects
+    assert other.val_subjects == first.val_subjects
+
+
+def test_old_split_files_have_no_background(written, meta):
+    split = sp.load_split(written[0])
+    assert split.background_classes == [] and split.lookalike_classes == []
+    assert len(sp.select(meta, split, "train_background")) == 0

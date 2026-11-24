@@ -29,6 +29,14 @@ Design choices where the spec is open:
   twice. ``class_source`` (``"single"`` for RecoFit) restricts eligibility counts and the
   train/val/test_known/test_unknown selections to one ``source``; ``None`` means no restriction.
   The non-exercise set always comes from ``source == "multi"``.
+* **Background splits** (``bg{seed}``, since 2026-11-23). A few named classes are known; the
+  other eligible classes are divided at random into *background* classes, whose windows may be
+  shown to a model during training as "not one of the known classes", and *held-out unknown*
+  classes, which appear only in the test set. ``tied`` groups (two labels of one exercise, and
+  hand-listed look-alike pairs) stay on one side, so a held-out class has no twin among the
+  background classes. ``lookalike_classes`` (variants of a known exercise) are in neither
+  list: they are never trained on and are tested as their own set. The subject folds are the
+  same as for the other splits.
 """
 
 from __future__ import annotations
@@ -45,8 +53,25 @@ from sklearn.model_selection import GroupKFold
 
 from uaar.utils import git_sha
 
-Part = Literal["train", "val", "test_known", "test_unknown"]
+Part = Literal[
+    "train",
+    "val",
+    "test_known",
+    "test_unknown",
+    "train_background",
+    "val_background",
+    "test_background",
+    "test_lookalike",
+]
 PARTS: tuple[str, ...] = ("train", "val", "test_known", "test_unknown")
+#: Parts that exist only for background splits (empty for the others).
+BACKGROUND_PARTS: tuple[str, ...] = (
+    "train_background",
+    "val_background",
+    "test_background",
+    "test_lookalike",
+)
+ALL_PARTS: tuple[str, ...] = PARTS + BACKGROUND_PARTS
 
 
 @dataclass
@@ -66,6 +91,8 @@ class Split:
     eligibility: dict = field(default_factory=dict)
     class_source: str | None = None
     fold_strategy: str = "random"
+    background_classes: list[str] = field(default_factory=list)
+    lookalike_classes: list[str] = field(default_factory=list)
     created_by: str = "unknown"
 
     @property
@@ -479,6 +506,128 @@ def write_splits(
     return written
 
 
+def make_background_split(
+    classes: Sequence[str],
+    known: Sequence[str],
+    lookalike: Sequence[str] = (),
+    frac_background: float = 0.5,
+    seed: int = 0,
+    tied: Iterable[Sequence[str]] = (),
+) -> tuple[list[str], list[str]]:
+    """Divide the classes that are neither known nor look-alikes into background and held-out.
+
+    Args:
+        classes: Eligible class names.
+        known: The known classes (must be eligible).
+        lookalike: Variants of a known exercise; in neither returned list.
+        frac_background: Fraction of the remaining classes that become background classes.
+        seed: Seed of the division.
+        tied: Groups kept on one side (see :func:`make_class_split`). Groups may overlap; they
+            are merged, so ``[a, b]`` and ``[b, c]`` keep ``a``, ``b`` and ``c`` together.
+
+    Returns:
+        ``(background, heldout)``, both sorted, disjoint, and disjoint from ``known`` and
+        ``lookalike``.
+    """
+    eligible = set(classes)
+    missing = [c for c in known if c not in eligible]
+    if missing:
+        raise ValueError(f"known classes not eligible: {missing}")
+    rest = sorted(eligible - set(known) - set(lookalike))
+    # merge overlapping groups (restricted to the remaining classes)
+    merged: list[set[str]] = []
+    for g in tied:
+        g = set(g) & set(rest)
+        if len(g) < 2:
+            continue
+        for m in [m for m in merged if m & g]:
+            g |= m
+            merged.remove(m)
+        merged.append(g)
+    heldout_frac = 1.0 - frac_background
+    background, heldout = make_class_split(
+        rest, frac_unknown=heldout_frac, seed=seed, tied=[sorted(m) for m in merged]
+    )
+    return background, heldout
+
+
+def write_background_splits(
+    meta: pd.DataFrame,
+    out_dir: Path,
+    known: Sequence[str],
+    lookalike: Sequence[str] = (),
+    seeds: Iterable[int] = (0, 1, 2),
+    frac_background: float = 0.5,
+    tied: Iterable[Sequence[str]] = (),
+    n_folds: int = 5,
+    min_subjects: int = 20,
+    min_minutes: float = 5.0,
+    val_frac: float = 0.15,
+    fold_seed: int = 0,
+    dataset: str | None = None,
+    hop_s: float = 1.0,
+    exclude: Iterable[str] = (),
+    class_source: str | None = None,
+    stratify_folds: bool = False,
+) -> list[Path]:
+    """Write ``fold{k}_bg{seed}.json`` for every fold and division seed.
+
+    The eligible classes and the subject folds are computed exactly as in :func:`write_splits`
+    (same arguments, same seed), so the folds are the ones of the ``rand``/``near`` files.
+    ``known_classes`` is ``known`` (sorted), ``unknown_classes`` the held-out classes,
+    ``background_classes`` and ``lookalike_classes`` as in :func:`make_background_split`.
+
+    Returns:
+        Paths of the written files, in ``(fold, seed)`` order.
+    """
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    dataset = dataset or out_dir.resolve().parent.name
+    classes = eligible_classes(
+        meta, min_subjects, min_minutes, hop_s=hop_s, exclude=exclude, source=class_source
+    )
+    lookalike = sorted(set(lookalike) & set(classes))
+    tied = [list(g) for g in tied]
+    divisions = [
+        (int(s), *make_background_split(classes, known, lookalike, frac_background, int(s), tied))
+        for s in seeds
+    ]
+    folds = make_subject_folds(
+        meta,
+        n_folds=n_folds,
+        val_frac=val_frac,
+        seed=fold_seed,
+        stratify_classes=classes if stratify_folds else None,
+        source=class_source,
+    )
+    sha = git_sha()
+    written: list[Path] = []
+    for k, fold in enumerate(folds):
+        for seed, background, heldout in divisions:
+            split = Split(
+                dataset=dataset,
+                fold=k,
+                n_folds=n_folds,
+                class_split=f"bg{seed}",
+                class_split_seed=seed,
+                train_subjects=fold["train_subjects"],
+                val_subjects=fold["val_subjects"],
+                test_subjects=fold["test_subjects"],
+                known_classes=sorted(known),
+                unknown_classes=heldout,
+                eligibility={"min_subjects": int(min_subjects), "min_minutes": float(min_minutes)},
+                class_source=class_source,
+                fold_strategy="class_stratified" if stratify_folds else "random",
+                background_classes=background,
+                lookalike_classes=lookalike,
+                created_by=sha,
+            )
+            path = out_dir / f"{split.split_id}.json"
+            split.save(path)
+            written.append(path)
+    return written
+
+
 def load_split(path: Path) -> Split:
     """Read one ``splits/<split_id>.json`` into a :class:`Split`."""
     return Split.from_dict(json.loads(Path(path).read_text()))
@@ -493,40 +642,89 @@ def select(meta: pd.DataFrame, split: Split, part: Part) -> np.ndarray:
         split: The split.
         part: ``"train"`` / ``"val"``: that fold's subjects, known classes only.
             ``"test_known"``: test subjects, known classes. ``"test_unknown"``: test subjects,
-            unknown classes. When ``split.class_source`` is set, only windows with that
-            ``source`` are returned.
+            unknown classes. ``"train_background"`` / ``"val_background"`` /
+            ``"test_background"``: that part's subjects, ``split.background_classes``.
+            ``"test_lookalike"``: test subjects, ``split.lookalike_classes``. When
+            ``split.class_source`` is set, only windows with that ``source`` are returned.
 
     Returns:
         int64 array of ``window_id`` values in ``meta`` order.
     """
-    if part not in PARTS:
-        raise ValueError(f"part must be one of {PARTS}, got {part!r}")
+    if part not in ALL_PARTS:
+        raise ValueError(f"part must be one of {ALL_PARTS}, got {part!r}")
     subjects = {
         "train": split.train_subjects,
         "val": split.val_subjects,
-        "test_known": split.test_subjects,
-        "test_unknown": split.test_subjects,
-    }[part]
-    classes = split.unknown_classes if part == "test_unknown" else split.known_classes
+        "test": split.test_subjects,
+    }[part.split("_")[0]]
+    classes = {
+        "unknown": split.unknown_classes,
+        "background": split.background_classes,
+        "lookalike": split.lookalike_classes,
+    }.get(part.split("_")[-1], split.known_classes)
     mask = meta["subject"].astype(str).isin(subjects) & meta["label"].astype(str).isin(classes)
     if split.class_source is not None:
         mask &= meta["source"].astype(str) == split.class_source
     return meta.loc[mask, "window_id"].to_numpy(dtype=np.int64)
 
 
-def select_nonexercise(meta: pd.DataFrame, split: Split, labels: list[str]) -> np.ndarray:
-    """Window ids of non-exercise windows (P1-b): test subjects, ``source == "multi"``, label in
-    ``labels`` (the idle/transition list). Independent of the class split.
+def select_nonexercise(
+    meta: pd.DataFrame, split: Split, labels: list[str], part: str = "test"
+) -> np.ndarray:
+    """Window ids of non-exercise windows (P1-b): ``source == "multi"``, label in ``labels``
+    (the idle/transition list), subjects of ``part`` (``"test"`` by default; ``"train"`` and
+    ``"val"`` give the windows a model may be shown as background). Independent of the class
+    split.
 
     Returns:
         int64 array of ``window_id`` values in ``meta`` order.
     """
+    subjects = {
+        "train": split.train_subjects,
+        "val": split.val_subjects,
+        "test": split.test_subjects,
+    }[part]
     mask = (
-        meta["subject"].astype(str).isin(split.test_subjects)
+        meta["subject"].astype(str).isin(subjects)
         & (meta["source"].astype(str) == "multi")
         & meta["label"].astype(str).isin(list(labels))
     )
     return meta.loc[mask, "window_id"].to_numpy(dtype=np.int64)
+
+
+def select_background(
+    meta: pd.DataFrame,
+    split: Split,
+    part: Literal["train", "val"],
+    nonexercise_labels: Sequence[str] = (),
+    n_exercise: int | None = None,
+    n_nonex: int | None = None,
+    seed: int = 0,
+) -> np.ndarray:
+    """Window ids a model may be shown as "not one of the known classes".
+
+    Exercise windows of ``split.background_classes`` and non-exercise windows
+    (``source == "multi"``, label in ``nonexercise_labels``), both from the subjects of
+    ``part``. Each kind is subsampled without replacement to at most ``n_exercise`` /
+    ``n_nonex`` windows (``None`` keeps all) with ``numpy.random.default_rng(seed)``.
+
+    Returns:
+        int64 ``window_id`` values, exercise windows first, each kind in ``meta`` order.
+    """
+    rng = np.random.default_rng(seed)
+
+    def cap(ids: np.ndarray, n: int | None) -> np.ndarray:
+        if n is None or len(ids) <= n:
+            return ids
+        return np.sort(rng.choice(ids, size=int(n), replace=False))
+
+    exercise = cap(select(meta, split, f"{part}_background"), n_exercise)
+    nonex = (
+        cap(select_nonexercise(meta, split, list(nonexercise_labels), part), n_nonex)
+        if len(nonexercise_labels)
+        else np.zeros(0, dtype=np.int64)
+    )
+    return np.concatenate([exercise, nonex]).astype(np.int64)
 
 
 def encode_labels(labels: Sequence[str] | pd.Series | np.ndarray, split: Split) -> np.ndarray:

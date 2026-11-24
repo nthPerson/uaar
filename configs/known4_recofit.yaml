@@ -1,0 +1,24 @@
+# RecoFit background splits `bg0`-`bg2` (decided 2026-11-23, docs/decisions.md): the
+# four-exercise benchmark that the three tiers (plain, taught, Other class) are compared on.
+#
+# known: the four demo exercises; the only classes a model is asked to recognize.
+known:
+  - "Two-arm Dumbbell Curl (both arms, not alternating)"
+  - "Shoulder Press (dumbbell)"
+  - "Lateral Raise"
+  - "Jumping Jacks"
+
+# lookalike: variants of a known exercise under another label. Never trained on and not part
+# of the unknown test set; evaluated as their own set (`test_lookalike`), where being accepted
+# is the reasonable outcome.
+lookalike:
+  - "Bicep Curl"
+  - "Squat Rack Shoulder Press"
+
+# The other eligible classes are divided at random, once per seed, into background classes
+# (windows a model may be shown in training as "not one of the known classes") and held-out
+# unknown classes (test only). Classes that are tied in configs/near_unknown_recofit.yaml
+# (its `tied` groups and its look-alike `pairs`) stay on one side, so a held-out class never
+# has a twin or a listed look-alike among the background classes.
+seeds: [0, 1, 2]
+frac_background: 0.5

@@ -4,7 +4,10 @@
     uv run scripts/prepare_data.py recofit --steps all
     uv run scripts/prepare_data.py recofit --steps recordings windows --force
 
-Each step skips when its outputs exist unless ``--force``. ``labels`` prints the per-label
+Each step skips when its outputs exist unless ``--force``. ``background_splits`` writes the
+``fold{k}_bg{seed}.json`` files of the four-exercise benchmark, from
+``configs/known4_<dataset>.yaml``, next to the ``rand``/``near`` files, which it does not
+touch. ``labels`` prints the per-label
 minutes and subject counts from ``recordings.meta.json`` (the T1 input and the list the
 known/unknown and ``near`` decisions are made from).
 """
@@ -22,7 +25,7 @@ from uaar.config import Config
 from uaar.data import registry, splits, windows
 from uaar.utils import timer
 
-STEPS = ["download", "recordings", "windows", "splits", "features"]
+STEPS = ["download", "recordings", "windows", "splits", "background_splits", "features"]
 
 
 def step_download(dataset: str, p: dict, force: bool) -> None:
@@ -110,6 +113,54 @@ def step_splits(dataset: str, p: dict, cfg: Config, force: bool, near_file: Path
                 print(f"    {c}")
 
 
+def step_background_splits(
+    dataset: str, p: dict, cfg: Config, force: bool, near_file: Path | None, known_file: Path
+) -> None:
+    """``fold{k}_bg{seed}.json``: a few known classes, background and held-out unknown classes."""
+    if not known_file.exists():
+        print(f"skip background splits (no {known_file})")
+        return
+    if any(p["splits_dir"].glob("fold*_bg*.json")) and not force:
+        print(f"skip background splits ({p['splits_dir']} has bg files)")
+        return
+    _, meta = registry.load_windows(dataset)
+    spec = yaml.safe_load(known_file.read_text())
+    tied: list[list[str]] = []
+    if near_file is not None and near_file.exists():
+        near = yaml.safe_load(near_file.read_text())
+        tied = [list(g) for g in near.get("tied") or []]
+        tied += [[a, b] for a, b in (near.get("pairs") or {}).items()]
+    with timer("background splits"):
+        written = splits.write_background_splits(
+            meta,
+            p["splits_dir"],
+            known=spec["known"],
+            lookalike=spec.get("lookalike") or [],
+            seeds=spec.get("seeds", [0, 1, 2]),
+            frac_background=float(spec.get("frac_background", 0.5)),
+            tied=tied,
+            n_folds=cfg.split.n_folds,
+            min_subjects=cfg.split.min_subjects,
+            min_minutes=cfg.split.min_minutes,
+            val_frac=cfg.split.val_frac,
+            dataset=dataset,
+            hop_s=cfg.data.hop_s,
+            exclude=cfg.get("split.nonexercise_labels", []) or [],
+            class_source=cfg.get("split.class_source"),
+            stratify_folds=bool(cfg.get("split.stratify_folds", False)),
+        )
+    print(f"{len(written)} background split files")
+    seen = set()
+    for path in written:
+        d = json.loads(path.read_text())
+        if d["class_split"] not in seen:
+            seen.add(d["class_split"])
+            print(f"{d['class_split']}: {len(d['known_classes'])} known, look-alike: "
+                  f"{d['lookalike_classes']}")  # fmt: skip
+            print(f"  background ({len(d['background_classes'])}): {d['background_classes']}")
+            print(f"  held-out unknown ({len(d['unknown_classes'])}): {d['unknown_classes']}")
+
+
 def step_features(dataset: str, p: dict, force: bool) -> None:
     try:
         from uaar.features import handcrafted
@@ -163,6 +214,13 @@ def main() -> None:
     )
     ap.add_argument("--near", type=Path, default=Path("configs/near_unknown_recofit.yaml"))
     ap.add_argument(
+        "--known",
+        type=Path,
+        default=None,
+        help="known/look-alike classes of the background splits "
+        "(default configs/known4_<dataset>.yaml; the step is skipped when the file is missing)",
+    )
+    ap.add_argument(
         "--limit", type=int, default=None, help="(debug) subjects limit, unused for now"
     )
     args = ap.parse_args()
@@ -183,6 +241,9 @@ def main() -> None:
             step_windows(p, cfg, args.force)
         elif s == "splits":
             step_splits(args.dataset, p, cfg, args.force, args.near)
+        elif s == "background_splits":
+            known = args.known or Path(f"configs/known4_{args.dataset}.yaml")
+            step_background_splits(args.dataset, p, cfg, args.force, args.near, known)
         elif s == "features":
             step_features(args.dataset, p, args.force)
 
