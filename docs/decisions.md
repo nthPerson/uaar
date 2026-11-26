@@ -8,11 +8,11 @@ Dated log of design and plan changes. Each entry says what changed, why, and whi
 
 **BMI160 configuration.** The range registers must be written after the sensors are in normal power mode, with a short delay between writes (datasheet interface idle time, 450 µs in suspend). Verified on kit UAAR-8428: 50.00 Hz, 20 ms spacing, zero dropped samples over 60 s, |a| = 0.987 g at rest, so the **(verify)** on units in `design/software-and-firmware.md` §4 is resolved: 4096 LSB/g and 32.8 LSB per °/s.
 
-**Live demo (new deliverable D8).** The final presentation includes a live demonstration: a kit streams over BLE to a browser page (Web Bluetooth in Windows Chrome, because WSL2 has no Bluetooth stack), the page forwards samples over a WebSocket to a FastAPI backend in WSL that runs the trained models, and the page shows per-window predictions, probabilities and the uncertainty score for the four methods side by side, with "unknown" flagged above τ. A replay mode that feeds a recorded session through the same path is the on-stage fallback. The Streamlit upload app required by the course is kept and shares the inference code.
+**Live demo (new deliverable D8).** The final presentation includes a live demonstration: a kit streams over BLE to a browser page (Web Bluetooth in Windows Chrome, because WSL2 has no Bluetooth stack), the page forwards samples over a WebSocket to a FastAPI backend in WSL that runs the trained models, and the page shows per-window predictions, probabilities and the uncertainty score for the four methods side by side, with "unknown" flagged above τ. A replay mode that feeds a recorded session through the same path is the on-stage fallback. The Streamlit upload app required by the course is kept and shares the inference code. *Superseded 2026-11-23: the live page is the course app, with three cards.*
 
-**Fine-tuning on our own recordings (new experiment P4-ft).** Besides the zero-shot wearable test (P4), the backbone pretrained on RecoFit is fine-tuned on our recordings (head and normalization statistics; backbone frozen unless ablated) and evaluated leave-one-subject-out between the two of us. One model is fine-tuned on both subjects for the demo. Updated: `design/evaluation.md` (P4-ft to be added with the recipe at item 6.2), `design/models.md` §6.
+**Fine-tuning on our own recordings (new experiment P4-ft).** Besides the zero-shot wearable test (P4), the backbone pretrained on RecoFit is fine-tuned on our recordings (head and normalization statistics; backbone frozen unless ablated) and evaluated leave-one-subject-out between the two of us. One model is fine-tuned on both subjects for the demo. Updated: `design/evaluation.md` (P4-ft to be added with the recipe at item 6.2), `design/models.md` §6. *Superseded by the fine-tuning recipe of 2026-11-23 (train on one person, test on the other).*
 
-**Exercise set (shortlist, to confirm against the printed RecoFit label list).** Known: bicep curl, dumbbell shoulder press, lateral raise, squat, jumping jacks (all in RecoFit and MM-Fit, visible from the wrist, doable in a classroom with light weights or a water bottle). Unknown: two or three of arm circles, shadow boxing, waving, towel wringing. Plus one minute each of standing still and walking. About 20 minutes per subject in one sitting.
+**Exercise set (shortlist, to confirm against the printed RecoFit label list).** Known: bicep curl, dumbbell shoulder press, lateral raise, squat, jumping jacks (all in RecoFit and MM-Fit, visible from the wrist, doable in a classroom with light weights or a water bottle). Unknown: two or three of arm circles, shadow boxing, waving, towel wringing. Plus one minute each of standing still and walking. About 20 minutes per subject in one sitting. *Superseded: RecoFit labels chosen 2026-11-05; four exercises (no squat) and MM-Fit dropped 2026-11-23.*
 
 **Repository.** `~/academics/COMPE510_uaar` on the WSL ext4 filesystem, GitHub `uaar` (public). The design folder of the proposal repository is frozen and copied to `docs/design/`; the OneDrive repository keeps the proposal deck and course handouts.
 
@@ -26,7 +26,7 @@ Table", "<Initial Activity>", "Note", "Invalid" (650 single-exercise recordings,
 Kept: "Non-Exercise" and "Rest" as the non-exercise set (P1-b), never as classes
 (`split.nonexercise_labels`); "Unlisted Exercise" (4 subjects, never eligible) and "Walk" as
 ordinary labels for now. The eligibility thresholds are still the spec defaults; the counts per
-alternative are in `data-pipeline.md` and the decision is item 4.4.
+alternative are in `data-pipeline.md` and the decision is item 4.4. *Superseded 2026-11-05: eligibility 25 subjects / 10 minutes; `Walk` is non-exercise.*
 
 ## 2026-11-04
 
@@ -49,7 +49,7 @@ times by default (`share_trunk=True`); `share_trunk=False` runs the full network
 identical outputs. Consequence for Q3: with this backbone MC Dropout does not cost T full
 passes (2.8 s against 19.2 s for the fold-0 test windows at T = 30; softmax 1.3 s), so the cost
 comparison with EDL must report both the general T-pass cost and the shared-trunk cost.
-To confirm with Sirena (owner of M4).
+To confirm with Sirena (owner of M4). *Inference cost was not measured (2026-11-25).*
 
 **Evaluation and logistic regression: where the code differs from the spec's wording.**
 (1) Logistic regression has 102 features, not "about 90" (the spec's own list gives 8 x 12 + 6).
@@ -73,7 +73,8 @@ Decided by Robert; the options and counts are in `data-pipeline.md`.
 has 25 subjects and 11.4 minutes) and it drops the 21-subject cohort, whose classes would have
 about four test subjects per fold. The plan's target of 10–16 known classes is replaced by 28:
 it cannot be reached with thresholds without losing the demo exercises, and hand-picking a
-smaller pool would be harder to defend.
+smaller pool would be harder to defend. *Superseded 2026-11-23: four known exercises; the
+28-class benchmark is kept as the hard case.*
 
 **Demo and recording exercise set (RecoFit label strings).**
 `Two-arm Dumbbell Curl (both arms, not alternating)`, `Shoulder Press (dumbbell)`,
@@ -81,7 +82,8 @@ smaller pool would be harder to defend.
 specific curl and squat labels are used instead of the generic `Bicep Curl` and `Squat`: they
 have 44 and 43 subjects instead of 25, and they fix the arm position, which is what a wrist
 sensor measures. We perform them as named (both arms together; arms held out in front).
-Updated: `wearable-recording.md` (protocol labels).
+Updated: `wearable-recording.md` (protocol labels). *Superseded 2026-11-23: the squat is
+dropped; four exercises.*
 
 **Walk is non-exercise.** `Walk` (12,128 windows, the largest label by far) joins `Non-Exercise`
 and `Rest` in `split.nonexercise_labels`: never a class, part of the P1-b test set, taken from
@@ -97,7 +99,8 @@ five pairs of labels that name the same exercise in two cohorts (Bicep Curl / Tw
 Curl, Squat / Squat (arms in front ...), Sit-ups / Sit-up (hands positioned behind head),
 Pushups / Pushup (knee or foot variation), Static stretch / Static Stretch (at your own pace))
 are kept on the same side (`tied`), so a random split never holds out an exercise whose twin is
-known; the `near` split does that on purpose.
+known; the `near` split does that on purpose. *Superseded 2026-11-23 for the demo and the
+wearable tests: they use the fold-0 `bg0` four-exercise models.*
 
 **Subject folds are stratified by exercise** (`split.stratify_folds: true`; decided by Robert
 the same day, after the counts below were shown). *Problem:* RecoFit is four participant
@@ -117,7 +120,8 @@ performed is used, no signals and no results. *Cost:* the split files were regen
 fold-0 runs restarted; the runs made on the old folds (two class splits) are kept in
 `reports/runs/unstratified-fold0/` and are not used. This replaces the plain `GroupKFold` of
 `design/datasets.md` §6. Full write-up with the before and after tables, worded for the
-report and slides: `data-pipeline.md`, "Subject folds are stratified by exercise".
+report and slides: `data-pipeline.md`, "Subject folds are stratified by exercise". *No
+confidence intervals or significance tests were computed (2026-11-25).*
 
 **EDL trains with the digamma loss, not the squared-error loss** (`configs/p1/edl.yaml`:
 `loss: digamma`; Robert asked for this to be tested on 2026-11-05 after the diagnostics below,
@@ -159,11 +163,13 @@ established. *Open for Robert:* keep `kl_weight` 1 for the main comparison (the 
 schedule, best vacuity, poor ECE) and report the KL weight as an ablation, or adopt 0.1.
 Code: `kl_weight` and `loss: log` were added to `uaar.models.edl` for these runs. The runs made
 with the squared-error loss are kept in `reports/runs/edl-mse-fold0/` and are not used.
+*The KL weight stays 1 (2026-11-25).*
 
 ## 2026-11-23
 
 Decided by Robert in a session with the AI assistant, after the fold-0 results of Nov 5 were
-reviewed (86 to 91 % of unknown windows accepted by every method on the 28-class benchmark).
+reviewed (84 to 93 % of unknown windows accepted at τ by every method on the 28-class
+benchmark; FPR@95 86 to 91 %).
 Write-up for the report and slides: `methods.md`, "Background windows in training".
 
 **The benchmark is cut to four known exercises.** `Two-arm Dumbbell Curl (both arms, not
@@ -216,7 +222,7 @@ validation windows, with the threshold at the 95 % quantile of the known validat
 (`uaar.models.base.open_macro_f1`), which mirrors how the Other-class model is selected. It
 uses validation data only and was fixed before the re-run, but the change was prompted by
 test results; the report should say so. The first runs are in
-`reports/runs/k4taught-f1-selection/`.
+`reports/runs/k4taught-f1-selection/`. *Accepted by Robert 2026-11-24.*
 
 **MC Dropout's primary score is entropy for taught networks**
 (`uaar.models.factory.primary_score`). Mutual information accepts 97 % of unknown windows
@@ -226,11 +232,13 @@ For plain networks the primary score stays mutual information.
 **MM-Fit and RecGym are dropped** (stretch goals 1 and 2; neither loader was started).
 Robert asked for confirmation that the course does not require more than one dataset; the
 requirement map in `design/README.md` §7 lists one public dataset, and the original
-instruction document is not on this machine, so that check is Robert's.
+instruction document is not on this machine, so that check is Robert's. *Checked 2026-11-24:
+one dataset is enough.*
 
 **Not decided here:** the EDL KL weight (still 1, the open question of Nov 5); whether the
 report's headline uses the share accepted at τ or FPR@95 (they differ most in fold 4, where τ
 from the validation subjects rejects about 10 % of the test subjects' known windows).
+*Headline decided 2026-11-24: the share accepted at τ. The KL weight stays 1 (2026-11-25).*
 
 **The course app is the live page, not a separate Streamlit app** (Robert, 2026-11-23). The
 requirement "upload data, show prediction, explain output" is met by `web/index.html`, served
@@ -286,4 +294,26 @@ related papers; it has no requirement for several datasets. Dropping MM-Fit and 
 contributions" is mandatory, AI use must be documented in the report, and the final
 presentation is described there as 10 to 15 slides in 10 minutes; the instructor has since set
 it at 6 to 7 minutes on Dec 3 (Robert), so the deck has seven slides.
+
+## 2026-11-25
+
+**Documentation brought in line with the project.** The README, `docs/`, `docs/design/`,
+`web/README.md` and `models/README.md` were checked against the code, the configs and the
+result tables, and now describe the project as it is: one dataset (RecoFit), the four-exercise
+benchmark in three tiers as the main experiment, the 28-class benchmark (fold 0 only) as the
+hard case, and the live page as the course app. Plans that were dropped are named in one
+sentence with a pointer to the dated entry here; earlier entries of this log are not rewritten,
+only given one-line pointers to the entries that supersede them.
+
+**Not done, and not planned before submission unless time allows:** several training seeds
+(results are mean ± sd over 15 runs, one seed); significance tests and bootstrap confidence
+intervals (`uaar.eval.stats` was never written); inference-cost measurements (`uaar.eval.cost`
+was never written); figures (the plotting functions in `uaar.eval.plots` exist, no script calls
+them); LED feedback from the page to the kit. The EDL KL weight stays 1, the value of the
+published schedule (the open question of 2026-11-05).
+
+**Ownership.** The two ownerships recorded are the course rule of one new algorithm per member:
+EDL is Robert's and MC Dropout is Sirena's. The design documents no longer assign other modules
+or roles; what each member did is recorded in `contributions.md`, where each member writes
+their own entries.
 

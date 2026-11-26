@@ -1,24 +1,28 @@
 # Methods
 
-Equation-to-code map for M1–M4. Each owner writes their section in their own words after the
-code works (development-spec §8.2); the tables below point at the implementation.
+Equation-to-code map for M1–M4, then the four-exercise benchmark and its results (last
+section). The section text for each method is written in our own words after the code works
+(development-spec §8.2); the lists below point at the implementation.
 
-## M2 softmax network (both)
+## M2 softmax network
 
-- Backbone: `uaar.models.backbone.ConvBackbone` (models.md §1), 28,908 parameters for K = 12.
+- Backbone: `uaar.models.backbone.ConvBackbone` (design/models.md §1), 28,388 parameters for
+  K = 4.
 - Loss: class-weighted cross-entropy (`uaar.models.base.class_weights`, inverse square-root).
 - Scores: `msp = 1 - max p`, predictive entropy (`uaar.models.base.entropy`).
-- Training: `uaar.models.train_loop.fit` (AdamW, cosine, early stopping on validation macro-F1).
+- Training: `uaar.models.train_loop.fit` (AdamW, cosine, early stopping on validation macro-F1;
+  for taught models open-set validation macro-F1, see "Choosing the checkpoint of a taught
+  model" below).
 
 ## M3 evidential deep learning (Robert)
 
 - Evidence and Dirichlet: `uaar.models.edl.EDLNet` (`alpha = softplus(z) + 1`), `dirichlet_summary`.
-- Loss Eq. 4 (digamma form, the default since 2026-11-05) + λ_t · Eq. 7: `edl_loss_digamma`; squared-error variant Eq. 5: `edl_loss`; log marginal likelihood Eq. 3: `edl_loss_log`; KL closed form: `kl_dirichlet_uniform`; annealing `kl_anneal`, λ_t = `kl_weight` · min(1, epoch / `kl_anneal_epochs`).
+- Loss Eq. 4 (digamma form, the default since 2026-11-05) + λ_t · Eq. 7: `edl_loss_digamma`; squared-error variant Eq. 5: `edl_loss`; log marginal likelihood Eq. 3: `edl_loss_log`; KL closed form: `kl_dirichlet_uniform`; annealing `kl_anneal`, λ_t = `kl_weight` · min(1, epoch / `kl_anneal_epochs`), with `kl_weight` 1 (the default; no config changes it) and a 10-epoch ramp.
 - Why not Eq. 5, and the variants tried: `decisions.md`, 2026-11-05, "EDL trains with the digamma loss".
 - Scores: vacuity `K / S`, `1 - max p̂`.
-- Section text: to be written by Robert after the fold-0 run.
+- Section text: to be written by Robert.
 
-## M1 logistic regression (Sirena writes, Robert reviews)
+## M1 logistic regression
 
 - Features: `uaar.features.handcrafted.compute`, 102 per window: 12 statistics (mean, std, min,
   max, p10, p50, p90, rms, zcr, domfreq, dompow, specent) for each of ax, ay, az, gx, gy, gz,
@@ -30,12 +34,9 @@ code works (development-spec §8.2); the tables below point at the implementatio
 - Choosing C: `GroupKFold(3)` over the training subjects on the grid {0.01, 0.1, 1, 10}, mean
   macro-F1, then a refit on all training windows; `history.csv` has one row per C. The grid is
   fitted in ascending C with warm starts and the three inner folds run in parallel, which
-  brought a fold-0 run from about 14 minutes to about 4.5.
+  brought a fold-0 run of the 28-class `p1` setting from about 14 minutes to about 4.5.
 - Scores: `msp = 1 - max p`, predictive entropy.
-- Seen on fold 0 (first run, both data copies): validation accuracy 0.754, macro-F1 0.729 with
-  C = 1. C = 1 and C = 10 cannot be told apart at this data size (inner-fold macro-F1 0.649
-  against 0.647; the warm-started C = 10 fit on the full training set stops after 0 iterations).
-- Section text: to be written by Sirena.
+- Section text: to be written.
 
 ## M4 Monte Carlo dropout (Sirena)
 
@@ -46,12 +47,15 @@ code works (development-spec §8.2); the tables below point at the implementatio
   call so results repeat.
 - Predictive mean and scores: `mc_scores` (`entropy` = H[p̄], `mi` = H[p̄] − mean_t H[p_t],
   `varratio` = 1 − modal votes / T).
+- Primary score: mutual information for plain networks, entropy for taught networks
+  (`uaar.models.factory.primary_score`; point 5 of the results below).
 - Cost: the backbone has Dropout only after the global pooling, so the convolutional part is
   identical in every pass. `share_trunk=True` (default) runs it once and repeats only the
   two-layer head; `share_trunk=False` runs the whole network T times. The outputs are equal
   (checked on the fold-0 test windows: maximum difference 0); the cost is not (2.8 s against
-  19.2 s for 36,404 windows at T = 30 on the laptop CPU; one softmax pass takes 1.3 s). The
-  cost table should report both.
+  19.2 s for 36,404 windows at T = 30 on the laptop CPU; one softmax pass takes 1.3 s).
+  Inference cost was not measured systematically; these timings (28-class `p1` fold-0 test
+  windows) are the only measurement.
 - Section text: to be written by Sirena.
 
 ## Background windows in training: plain, taught and "Other" (2026-11-23)
@@ -133,7 +137,8 @@ non-exercise, from the validation subjects) as the rejected class and the thresh
 quantile of the known validation scores (`uaar.models.base.open_macro_f1`). The Other-class
 model is selected on macro-F1 over its five classes, which is the same idea.
 
-This was found the hard way. The first sweep selected the taught models on known-class
+*Background, not report text (decisions.md, 2026-11-24: the report states the rule without
+narrating how it was found).* The first sweep selected the taught models on known-class
 macro-F1; they accepted 12.9 ± 11.4 % (softmax) and 17.0 ± 16.3 % (EDL) of unknown exercise
 windows, with 68 % in the worst run, where early stopping had kept the weights of the first
 epoch. With the open-set criterion the same runs give 6.3 ± 3.8 % and 5.2 ± 1.8 %. The earlier
@@ -142,7 +147,8 @@ runs are kept in `reports/runs/k4taught-f1-selection/` and are not in the tables
 ### Results (RecoFit, 5 subject folds × 3 background divisions, one seed)
 
 Share of test windows **accepted** as a known exercise at τ (lower is better, except "known
-kept"). Mean ± sd over the 15 runs.
+kept"). Mean ± sd over the 15 runs. This share is the headline metric (`decisions.md`,
+2026-11-24); FPR@95 and AUROC are supporting numbers.
 
 | Tier | Method | Score | Known accuracy | Known kept | Unknown exercises accepted | Non-exercise accepted | Unknown AUROC |
 |---|---|---|---|---|---|---|---|
@@ -158,7 +164,9 @@ kept"). Mean ± sd over the 15 runs.
 | Other class | Softmax | 1 − max known p | 0.958 ± 0.034 | 0.897 ± 0.054 | 0.051 ± 0.026 | 0.026 ± 0.015 | 0.972 ± 0.019 |
 
 The full table, with every score, FPR@95 and the background and look-alike sets, is
-`reports/tables/scores_by_protocol.md` (`uv run scripts/make_tables.py`).
+[`reports/tables/scores_by_protocol.md`](../reports/tables/scores_by_protocol.md)
+(`uv run scripts/make_tables.py`). It also has the rows of the 28-class hard case (`p1`, fold 0
+only, four class splits), where every method accepts 84 to 93 % of unknown windows at τ.
 
 What the table shows:
 

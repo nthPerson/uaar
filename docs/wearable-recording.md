@@ -7,7 +7,7 @@ session. The hardware and wire format are in [design/software-and-firmware.md](d
 
 | Kit | Owner | BLE name | IMU | Firmware | Gyro calibrated | Notes |
 |---|---|---|---|---|---|---|
-| K1 | Robert | `UAAR-8428` | BMI160 at 0x69 | 0.1.0 (2026-11-03) | not yet | bench-verified 2026-11-03: 50.00 Hz, 0 drops, \|a\| = 0.987 g at rest |
+| K1 | Robert | `UAAR-8428` | BMI160 at 0x69 | 0.1.0 (2026-11-03) | not yet | bench-verified 2026-11-03: 50.00 Hz, 0 drops, \|a\| = 0.987 g at rest; USB and Bluetooth checked 2026-11-23 (`decisions.md`) |
 | K2 | Sirena | | | | | to be assembled and flashed |
 
 Flash: `uv tool run platformio run -d firmware -t upload --upload-port /dev/ttyACM0` (WSL: run `firmware/tools/attach-xiao.sh` first). Calibrate once per kit: hold the button 3 s with the kit flat and still; the LED blinks fast for 3 s and the banner then reports `gyro bias applied`.
@@ -31,7 +31,7 @@ Flash: `uv tool run platformio run -d firmware -t upload --upload-port /dev/ttyA
 
 This is the way to record the protocol; it needs no cable and one person can do it alone.
 
-1. `uv run scripts/demo.py` (add `--no-models` if `models/` is missing), then open
+1. `uv run scripts/demo.py` (`--no-models` serves the pages without loading models), then open
    `http://localhost:8000/record.html` in Edge or Chrome on Windows.
 2. **Connect wearable**, set the person (Robert `W01`, Sirena `W02`), **Start session**.
 3. For each set the page says what is next. Press the kit's button: after a three-second
@@ -44,6 +44,8 @@ Details of the page: `web/README.md`. The USB recorder above stays as the fallba
 
 ## Protocol (revised 2026-11-23, about 20 minutes per subject)
 
+This protocol replaces the planned one in
+[design/software-and-firmware.md §5](design/software-and-firmware.md#5-recording-protocol).
 The models know four exercises (`decisions.md`, 2026-11-23). Type the short labels below;
 `configs/wearable.yaml` maps them to the model classes and says what each one is used for.
 The recording page shows this table as its checklist (the `protocol` list of the same file).

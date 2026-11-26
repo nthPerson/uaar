@@ -7,6 +7,7 @@ Commands are copy-pasteable and re-run before each milestone.
 
 ```bash
 uv run scripts/prepare_data.py recofit --steps recordings windows splits
+uv run scripts/prepare_data.py recofit --steps background_splits   # the four-exercise benchmark
 uv run scripts/prepare_data.py recofit --steps labels        # per-label minutes and subjects
 uv run scripts/prepare_data.py wearable --steps recordings windows
 ```
@@ -44,7 +45,8 @@ minutes and double the training time). Since 2026-11-04 `split.class_source: sin
 class eligibility and the train/val/test selections to the single file, as
 [design/datasets.md §1](design/datasets.md#1-recofit-primary) intended; the non-exercise set
 (P1-b) still comes from the multi file. Unique data: 132,787 exercise windows (single) and
-104,171 non-exercise windows (multi).
+104,171 non-exercise windows (multi), before `Walk` was moved to the non-exercise set on
+2026-11-05.
 
 ### Labels (from the windows, one source each; `prepare_data.py recofit --steps labels`)
 
@@ -143,17 +145,23 @@ threshold:
 | 29 | 27 | 27 | 26 | 19 |
 | 30 | 23 | 23 | 22 | 15 |
 | 40 | 11 | 11 | 10 | 7 |
-38 51 dropped at 25/10: ['Band Pull-Down Row', 'Biceps Curl (band)', 'Chest Press (rack)', 'Elliptical machine', 'Lawnmower (left arm)', 'Lawnmower (right arm)', 'Medicine Ball Slam', 'Rowing machine', 'Running (treadmill)', 'Squat (hands behind head)', 'Squat (kettlebell / goblet)', 'Triceps extension (lying down)', 'Wall Ball']
-total class windows single: 120659 nonex windows: 116305
 
-**Chosen: 25 subjects, 10 minutes** (`configs/base.yaml`): 38 classes, of which each class split
-holds out 10 as unknown and keeps 28 known. With `Walk` in the non-exercise set the unique data are
+Going from 20 to 25 subjects at 10 minutes drops 13 of the 51 classes: Band Pull-Down Row,
+Biceps Curl (band), Chest Press (rack), Elliptical machine, Lawnmower (left arm), Lawnmower
+(right arm), Medicine Ball Slam, Rowing machine, Running (treadmill), Squat (hands behind head),
+Squat (kettlebell / goblet), Triceps extension (lying down), Wall Ball.
+
+**Chosen: 25 subjects, 10 minutes** (`configs/base.yaml`): 38 classes. The 28-class hard case
+(`rand0`–`rand2`, `near`) keeps 28 of them known and holds out 10; the four-exercise benchmark
+divides them into 4 known, 2 look-alikes, 16 background and 16 held-out classes ("Background
+splits" below). With `Walk` in the non-exercise set the unique data are
 120,659 class windows (single file) and 116,305 non-exercise windows (multi file). Reasons and the alternatives are in `decisions.md`.
 
-### Splits (T1 input)
+### Splits of the 28-class hard case (T1 input)
 
 `uv run scripts/prepare_data.py recofit --steps splits --force` writes 20 files: 5 subject folds
-x (`rand0`, `rand1`, `rand2`, `near`). The `near` pairs and the tied twin labels are in
+x (`rand0`, `rand1`, `rand2`, `near`); the 15 `bg` files of the four-exercise benchmark are
+written by `background_splits` (below). The `near` pairs and the tied twin labels are in
 `configs/near_unknown_recofit.yaml`; the folds are class-stratified (next section). Windows per
 part, fold 0:
 
@@ -165,10 +173,7 @@ part, fold 0:
 | fold0_rand2 | 28 | 10 | 44,560 | 7,652 | 12,451 | 3,777 | 26,341 |
 
 Fold 0 has 63 training, 12 validation and 19 test subjects. Its non-exercise test set is 23,849
-`Non-Exercise`, 2,375 `Walk` and 117 `Rest` windows from the multi file. Demo exercises in
-`fold0_near` (subjects / windows): train Two-arm Dumbbell Curl 30 / 1,391, Shoulder Press
-(dumbbell) 29 / 1,042, Lateral Raise 20 / 976, Squat (arms in front) 29 / 1,540, Jumping Jacks
-17 / 469; validation 5, 5, 4, 5 and 3 subjects; test 9, 9, 6, 9 and 5 subjects.
+`Non-Exercise`, 2,375 `Walk` and 117 `Rest` windows from the multi file.
 
 ### Subject folds are stratified by exercise (decided 2026-11-05)
 
@@ -199,14 +204,13 @@ Jumping Jacks two) and 11 classes had two test subjects.
 1. *The rejection threshold comes from the validation subjects.* τ is the 95th percentile of
    the validation known-class scores, and it is never re-tuned. If a class is represented by
    one validation subject, τ for every method depends on how that one person moves.
-2. *Model selection uses validation macro-F1*, which weights every class equally. A class with
-   one validation subject contributes as much to early stopping as a class with eight.
-3. *The headline metrics are macro-averaged and their confidence intervals resample test
-   subjects.* A class with two test subjects has an unstable per-class F1 and can disappear
-   from a bootstrap resample altogether.
-4. *Method comparisons are paired by fold.* If folds differ mainly in which classes are
-   under-represented, fold-to-fold variation reflects fold composition and not the methods,
-   which weakens the Wilcoxon tests.
+2. *Model selection uses validation macro-F1* (for the taught models, open-set validation
+   macro-F1; `methods.md`), which weights every class equally. A class with one validation
+   subject contributes as much to early stopping as a class with eight.
+3. *The headline metrics are averaged over classes.* A class with two test subjects has an
+   unstable per-class score.
+4. *Results are reported as mean ± sd over folds.* If folds differ mainly in which classes are
+   under-represented, the spread reflects fold composition and not the methods.
 
 **What we do instead.** Subjects are assigned to folds by *iterative stratification*
 (Sechidis, Tsoumakas & Vlahavas 2011, a standard method for multi-label data), treating each
@@ -294,3 +298,6 @@ least 3 validation and 5 test subjects in every fold. The background training po
 
 See [wearable-recording.md](wearable-recording.md) for the sessions. The `wearable` dataset is
 built from `data/wearable/<subject>/<session>/` by `uaar.data.wearable.to_recordings`.
+Fine-tuning (`scripts/finetune.py`) does not use it: it reads the session folders directly
+through `uaar.data.wearable_windows`, with the label roles of `configs/wearable.yaml`. The only
+session recorded so far is the bench test `W01/test-60s`.

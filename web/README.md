@@ -33,7 +33,9 @@ One screen, no scrolling, light and large for a projector. It meets the course r
    device name, an arrow into the app, samples per second, samples uploaded and samples lost) or
    **Upload a recording** (a `raw.csv` written by either recorder; it is sent at the pace it was
    recorded). The trace shows the last 10 s of the accelerometer.
-2. **Prediction and uncertainty.** One card per model in `configs/demo.yaml`: the model's
+2. **Prediction and uncertainty.** One card per model in `configs/demo.yaml` (the plain softmax
+   network with 1 − max p, taught MC Dropout with predictive entropy, taught EDL with
+   vacuity; fold 0, background split `bg0`): the model's
    answer (an exercise, or **Unknown** in red), its uncertainty on a 0-100 % bar with the
    model's limit marked, and the last 30 answers as a strip. A model answers unknown when its
    uncertainty is over its limit. The bar is the model's own score divided by the largest value
@@ -51,7 +53,7 @@ window (`msedge --app=http://localhost:8000`) has no address bar or tabs.
 Exercise colours are fixed by class order (`--c0` ... in `demo.css`); with more than eight
 classes the chips are grey.
 
-# Recording page (`/record.html`)
+## Recording page (`/record.html`)
 
 For collecting our own labelled sets. One person can run it alone with the kit's button.
 
@@ -74,9 +76,10 @@ what is being saved under the label. Beeps mark the countdown, the start and the
 **Calibrate gyro** stores the gyro offsets in the kit (lay it still on a table first).
 
 The checklist (labels, sets, seconds, what each label is used for) is the `protocol` list of
-`configs/wearable.yaml`; the seconds of a row can be changed on the page. The files are the
-same three that `scripts/record_wearable.py` writes, and `uaar.data.wearable.load_session`
-reads them. Server side: `uaar.live.recorder`; messages: `uaar.live.server`.
+`configs/wearable.yaml`; the seconds of a row can be changed on the page. The page writes
+`raw.csv`, `events.csv` and `meta.json`, the same core files as `scripts/record_wearable.py`
+(which also writes `app.csv`, a plain `t,ax..gz` CSV, and `quicklook.png`), and
+`uaar.data.wearable.load_session` reads them. Server side: `uaar.live.recorder`; messages: `uaar.live.server`.
 
 `/record.html?sim` runs the page with a simulated wearable (Space is then its button), for
 trying it without a kit; sessions recorded that way have `"transport": "sim"` in `meta.json`.
