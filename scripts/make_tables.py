@@ -17,7 +17,7 @@ subfolder such as ``smoke/`` or ``edl-debug/`` stay out of the tables) and write
     FPR@95 and the AUROC. This is the table of the three tiers (k4plain, k4taught, k4other).
 
 Runs of different protocols are never averaged together. No significance tests or bootstrap
-intervals here (``uaar.eval.stats``, Robert).
+intervals are computed: the tables give the mean and standard deviation over runs.
 """
 
 from __future__ import annotations

@@ -1,9 +1,9 @@
 # RecoFit class-split hand choices (decided 2026-11-05, docs/decisions.md).
 #
 # pairs: the `near` split. Each key is held out as unknown; its value is the known class it
-# resembles. All five demo exercises (Two-arm Dumbbell Curl, Shoulder Press (dumbbell), Lateral
-# Raise, Squat (arms in front ...), Jumping Jacks) are known in this split, so its models are
-# the ones used for the wearable tests and the live demo.
+# resembles. This split belongs to the 28-class hard case (protocol p1, fold 0 only). The live
+# demo and the wearable tests use the four-exercise models instead (configs/known4_recofit.yaml,
+# docs/decisions.md 2026-11-23).
 pairs:
   "Bicep Curl": "Two-arm Dumbbell Curl (both arms, not alternating)"
   "Squat": "Squat (arms in front of body, parallel to ground)"

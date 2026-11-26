@@ -42,7 +42,7 @@ def paths(dataset: str) -> dict[str, Path]:
     """Every path of one dataset's processed layout.
 
     Args:
-        dataset: ``recofit``, ``mmfit``, ``recgym`` or ``wearable``.
+        dataset: ``recofit`` or ``wearable``.
 
     Returns:
         Dict with keys ``root``, ``external``, ``recordings``, ``recordings_meta``,

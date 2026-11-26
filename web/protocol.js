@@ -2,7 +2,7 @@
 // src/uaar/data/wearable.py; tests/test_web_protocol.py pins the constants below to the Python
 // module, so change all three together.
 //
-// Plain ES module, no dependencies, usable from the page (app.js) and from node:test.
+// Plain ES module, no dependencies, usable from the pages (link.js, demo.js, record.js) and from node:test.
 
 // ---- Identity --------------------------------------------------------------------------------
 export const DEVICE_NAME_PREFIX = 'UAAR-';

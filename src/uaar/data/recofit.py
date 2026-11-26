@@ -40,8 +40,8 @@ SAMPLE_RATE_HZ = 50.0
 MASTER_DEVICE = "rightArm"
 
 # Labels that are not movements of interest (device taps, band adjustment, notes). Matched as
-# case-insensitive substrings of the activity name. Finalized after the label list is printed
-# (development-spec §12); until then this list is a placeholder.
+# case-insensitive substrings of the activity name. Decided 2026-11-03 from the printed label
+# list (docs/decisions.md).
 # Names seen in the multi-activity file on 2026-11-03: "Tap Left Device", "Tap Right Device",
 # "Device on Table", "<Initial Activity>". "Non-Exercise" (idle) and "Unlisted Exercise" are kept.
 # The single-activity label table (2026-11-03) adds "Note" (11 min) and "Invalid" (1.5 min).

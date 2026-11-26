@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Evaluate one trained run on the P1 test sets (development-spec §3.5, §5).
+"""Evaluate one trained run on its test sets (development-spec §3.5, §5).
 
 Owner: Sirena. AI assistance recorded in docs/ai-use-log.md.
 

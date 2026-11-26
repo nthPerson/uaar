@@ -53,7 +53,7 @@ class ConvBackbone(nn.Module):
         self.head = nn.Linear(64, n_classes)
 
     def embed(self, x: torch.Tensor) -> torch.Tensor:
-        """Penultimate 64-d features (used by the Mahalanobis stretch method)."""
+        """Penultimate 64-d features."""
         return self.fc(self.pool(self.features(x)).squeeze(-1))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:

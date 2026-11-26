@@ -203,7 +203,7 @@ def main() -> None:
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    ap.add_argument("dataset", choices=["recofit", "mmfit", "recgym", "wearable"])
+    ap.add_argument("dataset", choices=["recofit", "wearable"])
     ap.add_argument("--steps", nargs="+", default=["all"], choices=STEPS + ["all", "labels"])
     ap.add_argument("--force", action="store_true")
     ap.add_argument(
